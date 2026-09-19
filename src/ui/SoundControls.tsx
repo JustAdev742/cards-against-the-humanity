@@ -42,6 +42,32 @@ export function MuteButton({ music, className = '' }: { music: Music; className?
   )
 }
 
+/** A phone's own sound switch. Small, always reachable, never in the way. */
+export function SoundToggle({
+  on,
+  onToggle,
+  className = '',
+}: {
+  on: boolean
+  onToggle: () => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={!on}
+      aria-label={on ? 'Turn button sounds off' : 'Turn button sounds on'}
+      className={
+        'grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-lg ' +
+        `transition-colors ${on ? 'text-ash-bright' : 'text-line'} hover:text-paper ${className}`
+      }
+    >
+      <SpeakerIcon muted={!on} className="w-5" />
+    </button>
+  )
+}
+
 /**
  * Music setup, in the lobby where the rest of the setting up happens.
  * A deployment that ships no track offers to play one off this device

@@ -59,35 +59,40 @@ may match a list of adult terms. If a card is ever misfiled, the tests fail.
 
 ## Sound
 
-Sound lives on the TV and haptics live on the phones. The TV has the speakers,
-and eight phones chirping at once would be unbearable.
-
 **The TV** plays background music on a loop and a handful of synthesised cues:
 a card landing when someone hands in, a flick when the Czar turns one over, and
 a chord when a round or the game is won. The music ducks under the winning card
 so the room hears the joke. Volume and mute are in the lobby and persist; the
 speaker icon in the corner and the <kbd>M</kbd> key toggle mute at any time.
 
-**Phones** buzz instead: a tick when you pick a card up, a firmer one when your
-cards go in, a pattern when the round wants something from you, and a flourish
-when you take it. Anyone who has asked their system for reduced motion gets none
-of it.
+**Phones** click and buzz together. A tick when you pick a card up, a lower one
+when you put it back, a two-note confirm when your cards go in, a low buzz if
+the table turns a move down, and a flourish when you take the round. The clicks
+are quiet and short by design, because a table can hold eight phones; the
+speaker icon in the phone's header turns them off, and the choice is remembered.
+Anyone who has asked their system for reduced motion gets no vibration.
 
-### Choosing a track
+Every cue on both screens is synthesised in the browser from a few oscillators,
+so there is nothing to download and nothing to license. The background music is
+the one exception: it is a real file, and it is the one thing here you should
+think about before redistributing.
 
-The deployed site ships no music, so it isn't redistributing anyone's. Press
-**Add music from this device** on the TV and pick an audio file; it loops for
-the whole game. On Chrome and Edge the choice is remembered between sessions, so
-you only pick it once.
+### The music track
 
-To bundle a track into your own build instead, drop it at
-`public/music/tv-loop.webm` and it is picked up automatically. That path is
-gitignored — keep whatever you put there out of a public repo unless you have
-the right to distribute it.
+A track ships with the site at `public/music/tv-loop.webm` and starts by itself
+when the TV opens a table. It is a 30 MB Opus file that streams as it plays, so
+the game is usable long before it has finished downloading.
+
+To use something else, press **Use a different track** on the TV and pick a file
+from that device; on Chrome and Edge the choice is remembered between sessions
+and takes priority over the bundled one. To change what ships, replace the file:
 
 ```bash
 ffmpeg -i whatever.mp3 -vn -c:a libopus -b:a 64k public/music/tv-loop.webm
 ```
+
+Only bundle music you have the right to distribute — the file is served to
+everyone who opens the site.
 
 ## Keyboard
 
@@ -195,7 +200,8 @@ Alike, it is released under the same licence: see [LICENSE.md](LICENSE.md). You
 may not sell it or any derivative of it.
 
 The room code input is adapted from the [21st.dev][21st] OTP input component.
-The sound cues are synthesised in the browser, so there is nothing to credit.
+The bundled music track is not covered by this licence; replace it if you
+redistribute this.
 
 [cc]: https://creativecommons.org/licenses/by-nc-sa/2.0/
 [21st]: https://21st.dev/@ddoemonn/components/otp-input

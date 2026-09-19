@@ -112,3 +112,43 @@ export function sfxDeal(): void {
     noise({ at: i * 0.06, peak: 0.1, decay: 0.07, from: 1800, to: 500 })
   }
 }
+
+/* ── Phone interface sounds ─────────────────────────────────────
+   Much smaller than the table sounds above: a phone is six inches from
+   a face, and a room can hold eight of them. These are dry clicks in the
+   40–140 ms range, quiet enough to sit under conversation. */
+
+/** Picking a card up. */
+export function sfxTap(): void {
+  noise({ peak: 0.07, decay: 0.028, from: 3200, to: 1800, q: 1.8 })
+  tone(880, { peak: 0.06, attack: 0.002, decay: 0.035, type: 'sine' })
+}
+
+/** Putting one back down. */
+export function sfxUntap(): void {
+  noise({ peak: 0.055, decay: 0.03, from: 2200, to: 1100, q: 1.8 })
+  tone(560, { peak: 0.05, attack: 0.002, decay: 0.04, type: 'sine' })
+}
+
+/** A committed action: cards in, winner chosen, seat taken. */
+export function sfxConfirm(): void {
+  tone(660, { peak: 0.085, attack: 0.004, decay: 0.06, type: 'triangle' })
+  tone(990, { at: 0.055, peak: 0.075, attack: 0.004, decay: 0.09, type: 'triangle' })
+}
+
+/** Stepping back out of something. */
+export function sfxBack(): void {
+  tone(660, { peak: 0.06, attack: 0.004, decay: 0.05, type: 'sine' })
+  tone(440, { at: 0.05, peak: 0.055, attack: 0.004, decay: 0.08, type: 'sine' })
+}
+
+/** The table turned a move down. */
+export function sfxDeny(): void {
+  tone(200, { peak: 0.09, attack: 0.004, decay: 0.12, type: 'sawtooth', to: 150 })
+}
+
+/** The round has turned and it wants something from you. */
+export function sfxNudge(): void {
+  tone(740, { peak: 0.07, attack: 0.006, decay: 0.1, type: 'sine' })
+  tone(988, { at: 0.11, peak: 0.07, attack: 0.006, decay: 0.14, type: 'sine' })
+}

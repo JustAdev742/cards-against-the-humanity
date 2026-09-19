@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 
-import { tapPlayed, tapSelect, tapWon, tapYourTurn } from '../audio/haptics.ts'
+import { FeedbackProvider, useFeedback } from '../audio/feedback.tsx'
 import { MIN_PLAYERS, RANDO_ID } from '../game/types.ts'
 import { rememberName, rememberedName, useClient, useWakeLock } from '../net/hooks.ts'
 import type { Client, ClientSnapshot } from '../net/client.ts'
@@ -13,8 +13,17 @@ import { DeckChoice } from '../ui/DeckChoice.tsx'
 import { TargetScore } from '../ui/TargetScore.tsx'
 import { CodeInput } from '../ui/CodeInput.tsx'
 import { PlayerChip, PlayerDot } from '../ui/PlayerChip.tsx'
+import { SoundToggle } from '../ui/SoundControls.tsx'
 
-export function Phone({ initialCode, onExit }: { initialCode: string; onExit: () => void }) {
+export function Phone(props: { initialCode: string; onExit: () => void }) {
+  return (
+    <FeedbackProvider>
+      <PhoneSeat {...props} />
+    </FeedbackProvider>
+  )
+}
+
+function PhoneSeat({ initialCode, onExit }: { initialCode: string; onExit: () => void }) {
   const [entry, setEntry] = useState<{ code: string; name: string } | null>(null)
   const { snapshot, client } = useClient(entry?.code ?? null, entry?.name ?? '')
 
@@ -71,6 +80,7 @@ function JoinForm({
   onJoin: (code: string, name: string) => void
   onExit: () => void
 }) {
+  const feedback = useFeedback()
   const [code, setCode] = useState(initialCode.toUpperCase().slice(0, 4))
   const [name, setName] = useState(rememberedName())
   const [touched, setTouched] = useState(false)
@@ -80,10 +90,14 @@ function JoinForm({
   const nameReady = name.trim().length > 0
   const submit = () => {
     setTouched(true)
+    // The first tap is also the gesture a browser wants before it makes a sound.
+    feedback.unlock()
     if (codeReady && nameReady) {
+      feedback.confirm()
       onJoin(code, name.trim())
       return
     }
+    feedback.deny()
     // Send the cursor to whichever field is holding things up. The code
     // input focuses itself when it goes invalid, so only the name needs this.
     if (codeReady && !nameReady) nameRef.current?.focus()
@@ -91,7 +105,14 @@ function JoinForm({
 
   return (
     <main className="flex min-h-dvh flex-col px-5 pb-[max(1.5rem,var(--inset-bottom))] pt-[max(1.5rem,var(--inset-top))]">
-      <button type="button" onClick={onExit} className="label w-fit cursor-pointer hover:text-paper!">
+      <button
+        type="button"
+        onClick={() => {
+          feedback.back()
+          onExit()
+        }}
+        className="label w-fit cursor-pointer hover:text-paper!"
+      >
         ← Back
       </button>
 
@@ -185,20 +206,29 @@ function Seat({
   table: TableView
   self: SelfView
 }) {
+  const feedback = useFeedback()
   const me = table.players.find((p) => p.id === self.playerId)
 
-  // A phone spends the round in a pocket. Buzz when it needs its owner back.
+  // A phone spends the round in a pocket. Nudge when it needs its owner back.
   const lastCue = useRef('')
   useEffect(() => {
     const cue = `${table.round}:${table.phase}:${self.isCzar}`
     if (cue === lastCue.current) return
     lastCue.current = cue
 
-    if (table.phase === 'writing' && !self.isCzar && !self.submitted) tapYourTurn()
-    if (table.phase === 'writing' && self.isCzar) tapYourTurn()
-    if (table.phase === 'judging' && self.isCzar) tapYourTurn()
-    if (table.phase === 'roundEnd' && table.winnerId === self.playerId) tapWon()
-  }, [table.round, table.phase, table.winnerId, self.isCzar, self.submitted, self.playerId])
+    if (table.phase === 'writing' && !self.isCzar && !self.submitted) feedback.nudge()
+    if (table.phase === 'writing' && self.isCzar) feedback.nudge()
+    if (table.phase === 'judging' && self.isCzar) feedback.nudge()
+    if (table.phase === 'roundEnd' && table.winnerId === self.playerId) feedback.win()
+  }, [
+    table.round,
+    table.phase,
+    table.winnerId,
+    self.isCzar,
+    self.submitted,
+    self.playerId,
+    feedback,
+  ])
 
   return (
     <>
@@ -208,7 +238,7 @@ function Seat({
         ) : (
           <span className="label">Joining</span>
         )}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {table.phase !== 'lobby' && (
             <span className="label">
               Round <span className="mono text-paper!">{table.round}</span>
@@ -217,6 +247,7 @@ function Seat({
           <span className="label mono text-ash-bright!" translate="no">
             {table.code}
           </span>
+          <SoundToggle on={feedback.soundOn} onToggle={feedback.toggleSound} className="-mr-2" />
         </div>
       </header>
 
@@ -268,6 +299,7 @@ function PhoneLobby({
   self: SelfView
   client: Client | null
 }) {
+  const feedback = useFeedback()
   const ready = table.players.filter((p) => p.connected).length
   const short = MIN_PLAYERS - ready
 
@@ -324,7 +356,13 @@ function PhoneLobby({
               Deal in Rando Cardrissian: a random card plays every round. If it wins,
               everyone should feel bad.
             </label>
-            <Button disabled={short > 0} onClick={() => client?.send({ type: 'start' })}>
+            <Button
+              disabled={short > 0}
+              onClick={() => {
+                feedback.confirm()
+                client?.send({ type: 'start' })
+              }}
+            >
               {short > 0 ? `Need ${short} more` : 'Start the game'}
             </Button>
           </>
@@ -352,6 +390,7 @@ function PhoneWriting({
   self: SelfView
   client: Client | null
 }) {
+  const feedback = useFeedback()
   const [picked, setPicked] = useState<string[]>([])
   const need = table.black?.p ?? 1
 
@@ -359,8 +398,12 @@ function PhoneWriting({
   useEffect(() => {
     setPicked([])
     client?.clearMoveError()
-    tapSelect()
   }, [table.round, client])
+
+  // The host turned a move down; say so rather than only showing it.
+  useEffect(() => {
+    if (snapshot.moveError) feedback.deny()
+  }, [snapshot.moveError, feedback])
 
   if (self.isCzar) {
     return (
@@ -397,6 +440,7 @@ function PhoneWriting({
 
   const toggle = (index: number) => {
     const key = `${index}`
+    const dropping = picked.includes(key)
     setPicked((current) => {
       const at = current.indexOf(key)
       if (at !== -1) return current.filter((k) => k !== key)
@@ -404,12 +448,14 @@ function PhoneWriting({
       return [...current, key]
     })
     client?.clearMoveError()
+    if (dropping) feedback.deselect()
+    else feedback.select()
   }
 
   const play = () => {
     const cards = picked.map((key) => self.hand[Number(key)])
     client?.send({ type: 'play', cards })
-    tapPlayed()
+    feedback.confirm()
   }
 
   return (
@@ -507,6 +553,7 @@ function PhoneJudging({
   self: SelfView
   client: Client | null
 }) {
+  const feedback = useFeedback()
   const [candidate, setCandidate] = useState<string | null>(null)
   const reduced = useReducedMotion()
 
@@ -553,7 +600,13 @@ function PhoneJudging({
           <p className="m-0 text-center text-ash-bright">
             {table.revealed.length} of {table.submissionCount} read out.
           </p>
-          <Button className="w-full" onClick={() => client?.send({ type: 'reveal' })}>
+          <Button
+            className="w-full"
+            onClick={() => {
+              feedback.confirm()
+              client?.send({ type: 'reveal' })
+            }}
+          >
             {table.revealed.length === 0 ? 'Turn the first one over' : `Next one (${left} left)`}
           </Button>
         </div>
@@ -567,7 +620,11 @@ function PhoneJudging({
                 <li key={submission.playerId} className="pb-7">
                   <button
                     type="button"
-                    onClick={() => setCandidate(chosen ? null : submission.playerId)}
+                    onClick={() => {
+                      if (chosen) feedback.deselect()
+                      else feedback.select()
+                      setCandidate(chosen ? null : submission.playerId)
+                    }}
                     aria-pressed={chosen}
                     aria-label={
                       table.black
@@ -617,7 +674,10 @@ function PhoneJudging({
                 >
                   <Button
                     className="w-full"
-                    onClick={() => client?.send({ type: 'choose', playerId: candidate })}
+                    onClick={() => {
+                      feedback.confirm()
+                      client?.send({ type: 'choose', playerId: candidate })
+                    }}
                   >
                     Give them the point
                   </Button>
