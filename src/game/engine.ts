@@ -17,15 +17,14 @@ const BLACK = blackCards as BlackCard[]
 const WHITE = whiteCards as string[]
 
 /* ── Which cards are in play ────────────────────────────────────
-   The family deck is an allowlist of exact card text, so the card
-   itself is only ever written down once. */
-const FAMILY_WHITE = new Set(familyWhite as string[])
-const FAMILY_BLACK = new Set(familyBlack as string[])
+   Two separate printed decks, not one filtered down to the other. The
+   Family Edition is its own box with its own jokes, written for a table
+   with kids at it rather than the adult deck with the worst bits pulled. */
+const FAMILY_BLACK = familyBlack as BlackCard[]
+const FAMILY_WHITE = familyWhite as string[]
 
-const whitePool = (deck: DeckMode) =>
-  deck === 'family' ? WHITE.filter((t) => FAMILY_WHITE.has(t)) : WHITE
-const blackPool = (deck: DeckMode) =>
-  deck === 'family' ? BLACK.filter((c) => FAMILY_BLACK.has(c.t)) : BLACK
+const whitePool = (deck: DeckMode) => (deck === 'family' ? FAMILY_WHITE : WHITE)
+const blackPool = (deck: DeckMode) => (deck === 'family' ? FAMILY_BLACK : BLACK)
 
 export function deckCounts(deck: DeckMode) {
   return { white: whitePool(deck).length, black: blackPool(deck).length }
@@ -36,6 +35,7 @@ export const DEFAULT_OPTIONS: GameOptions = {
   targetScore: 7,
   handSize: 10,
   rando: false,
+  meritocracy: false,
 }
 
 /* ── Randomness ─────────────────────────────────────────────────
@@ -65,10 +65,25 @@ function shuffle<T>(items: readonly T[], rand: () => number): T[] {
 /** Room codes leave out letters that get misread across a room: I, O, Q, S, Z. */
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPRTUVWXY'
 
+/**
+ * A handful of codes are reserved as the public tables. Anyone can walk up to
+ * one, so they have to be codes a stranger could guess — that is the point.
+ * Keeping them inside the normal code space means joining, sharing and the
+ * QR code all work on a public table exactly as they do on a private one.
+ */
+export const PUBLIC_CODES: readonly string[] = CODE_ALPHABET.split('').map((c) => `PUB${c}`)
+
+export const isPublicCode = (code: string): boolean =>
+  PUBLIC_CODES.includes(code.toUpperCase())
+
 export function makeRoomCode(rand: () => number = Math.random): string {
-  let code = ''
-  for (let i = 0; i < 4; i++) code += CODE_ALPHABET[Math.floor(rand() * CODE_ALPHABET.length)]
-  return code
+  for (let attempt = 0; attempt < 20; attempt++) {
+    let code = ''
+    for (let i = 0; i < 4; i++) code += CODE_ALPHABET[Math.floor(rand() * CODE_ALPHABET.length)]
+    // A private table must never land on one of the public codes.
+    if (!isPublicCode(code)) return code
+  }
+  return 'AAAA'
 }
 
 export function randomSeed(): number {
@@ -370,6 +385,21 @@ export function chooseWinner(state: GameState, playerId: string): GameState {
   return state
 }
 
+/**
+ * Who judges the next round. Normally the job goes round the table in seat
+ * order, which is what the printed rules say; under the Meritocracy house
+ * rule it goes to whoever just won.
+ */
+export function nextCzarId(state: GameState): string | null {
+  if (state.options.meritocracy && state.winnerId && state.winnerId !== RANDO_ID) {
+    const winner = state.players.find((p) => p.id === state.winnerId)
+    if (winner?.connected) return winner.id
+  }
+  const czarIndex = state.players.findIndex((p) => p.id === state.czarId)
+  const seat = nextConnectedFrom(state, czarIndex + 1)
+  return seat === -1 ? null : state.players[seat].id
+}
+
 export function nextRound(state: GameState): GameState {
   if (state.phase !== 'roundEnd') return state
 
@@ -379,8 +409,9 @@ export function nextRound(state: GameState): GameState {
     return state
   }
 
-  const czarIndex = state.players.findIndex((p) => p.id === state.czarId)
-  return startRound(state, czarIndex + 1)
+  const next = nextCzarId(state)
+  const seat = next === null ? -1 : state.players.findIndex((p) => p.id === next)
+  return startRound(state, seat === -1 ? 0 : seat)
 }
 
 export function playAgain(state: GameState): GameState {

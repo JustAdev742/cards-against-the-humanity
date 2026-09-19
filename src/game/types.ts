@@ -35,6 +35,11 @@ export interface GameOptions {
   handSize: number
   /** Rando Cardrissian: a random card is played for an imaginary player. */
   rando: boolean
+  /**
+   * Meritocracy, from the printed house rules: the winner of a round judges
+   * the next one, instead of the job passing round the table in seat order.
+   */
+  meritocracy: boolean
 }
 
 export interface GameState {

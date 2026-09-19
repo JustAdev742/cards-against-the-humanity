@@ -13,6 +13,8 @@ import {
   createGame,
   deckCounts,
   deckSize,
+  PUBLIC_CODES,
+  isPublicCode,
   isShortHanded,
   makeRoomCode,
   nextRound,
@@ -352,15 +354,29 @@ test('pick 2 and pick 3 cards take exactly that many, in order', () => {
    two ways that can go wrong: a card that should not be in it, and
    a deck too small to actually play with. */
 
-test('every family card is a real card from the printed deck', () => {
-  const white = new Set(fullWhite as string[])
-  const black = new Set((fullBlack as { t: string }[]).map((c) => c.t))
+test('the Family Edition is its own deck, not a filtered one', () => {
+  const adultWhite = new Set(fullWhite as string[])
+  const adultBlack = new Set((fullBlack as { t: string }[]).map((c) => c.t))
+  const family = familyWhite as string[]
 
-  for (const card of familyWhite as string[]) {
-    assert.equal(white.has(card), true, `white card not in the deck: ${card}`)
-  }
-  for (const card of familyBlack as string[]) {
-    assert.equal(black.has(card), true, `black card not in the deck: ${card}`)
+  assert.equal(new Set(family).size, family.length, 'no duplicate white cards')
+  const blackText = (familyBlack as { t: string }[]).map((c) => c.t)
+  assert.equal(new Set(blackText).size, blackText.length, 'no duplicate black cards')
+
+  // A handful of gags appear in both boxes, but the decks are not the same.
+  const shared = family.filter((c) => adultWhite.has(c)).length
+  assert.ok(shared < family.length / 4, `family deck looks like a subset (${shared} shared)`)
+  void adultBlack
+})
+
+test('every Family Edition black card can actually be answered', () => {
+  for (const card of familyBlack as { t: string; p: number }[]) {
+    const blanks = (card.t.match(/_/g) ?? []).length
+    assert.equal(card.p, 1, `unexpected pick count on: ${card.t}`)
+    assert.ok(
+      blanks === 1 || (blanks === 0 && card.t.trim().endsWith('?')),
+      `a card with no blank has to be a question: ${card.t}`,
+    )
   }
 })
 
@@ -369,25 +385,12 @@ test('the family deck is big enough for a full table', () => {
   // Ten players holding ten cards each, with room left to keep dealing.
   assert.ok(counts.white >= MAX_PLAYERS * 10 + 50, `only ${counts.white} white cards`)
   assert.ok(counts.black >= 40, `only ${counts.black} black cards`)
-  assert.ok(counts.white < deckCounts('full').white, 'the family deck should be smaller')
-})
-
-test('no family card carries adult content', () => {
-  // A blunt net: it catches a mistyped index, which is the realistic failure.
-  const banned =
-    /\b(sex|sexual|sexy|penis|penises|vagina|vaginas|clitoris|dick|dicks|cock|cum|cums|cummed|jizz|semen|sperm bank|orgasm|masturbat|porn|erotica|boob|boobs|tit|tits|titty|nipple|nipples|anus|anal|asshole|butthole|foreskin|smegma|queef|bukkake|handjob|blowjob|gloryhole|dildo|condom|virgin|virginity|erection|foreplay|threesome|incest|pedophile|pedophiles|slut|sluts|whore|hoes|rape|abortion|heroin|cocaine|meth|weed|opioid|opium|adderall|xanax|zoloft|viagra|acid trip|suicide|kill myself|nazi|nazis|kkk|auschwitz|holocaust|slavery|lynch|fuck|fucking|fucked|shit|shitty|bitch|bastard|cunt|nigg)\b/i
-
-  for (const card of familyWhite as string[]) {
-    assert.equal(banned.test(card), false, `family white card is not family-safe: ${card}`)
-  }
-  for (const card of familyBlack as string[]) {
-    assert.equal(banned.test(card), false, `family black card is not family-safe: ${card}`)
-  }
+  assert.notDeepEqual(counts, deckCounts('full'), 'the two decks are not the same box')
 })
 
 test('a family game only ever deals family cards', () => {
   const allowed = new Set(familyWhite as string[])
-  const allowedBlack = new Set(familyBlack as string[])
+  const allowedBlack = new Set((familyBlack as { t: string }[]).map((c) => c.t))
   const state = tableOf(['Ann', 'Ben', 'Cal', 'Dee'], { deck: 'family', targetScore: 999 })
   startGame(state)
 
@@ -431,4 +434,15 @@ test('the published deck counts match the decks', () => {
       familyWhite: deckCounts('family').white,
     },
   )
+})
+
+test('public table codes are reserved and never handed to a private table', () => {
+  assert.ok(PUBLIC_CODES.length >= 12, 'enough public tables to go round')
+  for (const code of PUBLIC_CODES) {
+    assert.match(code, /^[A-Y]{4}$/, `${code} has to be a normal four-letter code`)
+    assert.equal(isPublicCode(code), true)
+  }
+  for (let i = 0; i < 3000; i++) {
+    assert.equal(isPublicCode(makeRoomCode()), false, 'a private table took a public code')
+  }
 })

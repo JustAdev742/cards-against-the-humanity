@@ -6,6 +6,6 @@
 export const DECK_COUNTS = {
   black: 100,
   white: 500,
-  familyBlack: 84,
-  familyWhite: 237,
+  familyBlack: 95,
+  familyWhite: 500,
 } as const

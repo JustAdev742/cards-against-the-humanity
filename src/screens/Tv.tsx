@@ -350,15 +350,26 @@ function Lobby({
               </p>
             </div>
           )}
-          <label className="mt-[1.6vh] flex w-fit cursor-pointer items-center gap-3 text-[min(1.3vw,1.05rem)] text-ash-bright">
-            <input
-              type="checkbox"
-              checked={table.rando}
-              onChange={(event) => host?.setOptions({ rando: event.target.checked })}
-              className="h-5 w-5 accent-white"
-            />
-            Deal Rando Cardrissian in: a random card plays every round.
-          </label>
+          <div className="mt-[1.6vh] flex flex-col gap-[1vh]">
+            <label className="flex w-fit cursor-pointer items-center gap-3 text-[min(1.3vw,1.05rem)] text-ash-bright">
+              <input
+                type="checkbox"
+                checked={table.rando}
+                onChange={(event) => host?.setOptions({ rando: event.target.checked })}
+                className="h-5 w-5 accent-white"
+              />
+              Deal Rando Cardrissian in: a random card plays every round.
+            </label>
+            <label className="flex w-fit cursor-pointer items-center gap-3 text-[min(1.3vw,1.05rem)] text-ash-bright">
+              <input
+                type="checkbox"
+                checked={table.meritocracy}
+                onChange={(event) => host?.setOptions({ meritocracy: event.target.checked })}
+                className="h-5 w-5 accent-white"
+              />
+              Meritocracy: whoever wins a round judges the next one.
+            </label>
+          </div>
         </div>
       </section>
     </div>
@@ -517,6 +528,7 @@ function RevealedRow({ table, reduced }: { table: TableView; reduced: boolean | 
 function Winner({ table }: { table: TableView }) {
   const reduced = useReducedMotion()
   const winner = table.players.find((p) => p.id === table.winnerId)
+  const nextUp = table.players.find((p) => p.id === table.nextCzarId)
   const isRando = table.winnerId === RANDO_ID
   const name = isRando ? 'Rando Cardrissian' : (winner?.name ?? 'Nobody')
 
@@ -555,7 +567,9 @@ function Winner({ table }: { table: TableView }) {
         </span>
       </motion.div>
 
-      <p className="label text-[min(1.2vw,1rem)]!">Next round deals in a moment</p>
+      <p className="label text-[min(1.2vw,1rem)]!">
+        {nextUp ? `${nextUp.name} judges the next round` : 'Next round deals in a moment'}
+      </p>
     </div>
   )
 }

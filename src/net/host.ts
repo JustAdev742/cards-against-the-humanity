@@ -4,9 +4,11 @@ import {
   addPlayer,
   chooseWinner,
   createGame,
+  PUBLIC_CODES,
   deckCounts,
   isShortHanded,
   makeRoomCode,
+  nextCzarId,
   nextRound,
   pendingPlayers,
   playAgain,
@@ -20,6 +22,7 @@ import {
 import { RANDO_ID, type DeckMode, type GameState } from '../game/types.ts'
 import { peerOptions } from './peer.ts'
 import {
+  AWAY_GRACE_MS,
   PLAYER_TIMEOUT_MS,
   peerIdForRoom,
   type ClientMessage,
@@ -29,6 +32,32 @@ import {
 } from './protocol.ts'
 
 export type HostStatus = 'starting' | 'open' | 'error'
+
+/**
+ * One seat's worth of connection, as the table sees it. A phone reaches the
+ * table over WebRTC; the person running the table reaches it by calling a
+ * function. Both look like this from here.
+ */
+interface Channel {
+  readonly open: boolean
+  send(message: ServerMessage): void
+  close(): void
+  /** The transport under this channel, when there is one. */
+  peerConnection?: RTCPeerConnection
+}
+
+function fromDataConnection(connection: DataConnection): Channel {
+  return {
+    get open() {
+      return connection.open
+    },
+    send: (message) => connection.send(message),
+    close: () => connection.close(),
+    get peerConnection() {
+      return (connection as unknown as { peerConnection?: RTCPeerConnection }).peerConnection
+    },
+  }
+}
 
 export interface HostSnapshot {
   status: HostStatus
@@ -71,6 +100,8 @@ export function tableView(state: GameState): TableView {
     winningCards: state.winningCards,
     targetScore: state.options.targetScore,
     rando: state.options.rando,
+    meritocracy: state.options.meritocracy,
+    nextCzarId: state.phase === 'roundEnd' ? nextCzarId(state) : null,
     deck: state.options.deck,
     deckCounts: deckCounts(state.options.deck),
     waitingOn: pendingPlayers(state).map((p) => p.name),
@@ -93,11 +124,20 @@ function selfView(state: GameState, playerId: string, hostId: string | null): Se
  * The TV. It owns the deck, the scores and every rule; phones only ever
  * send intents, and each one is re-checked here before it counts.
  */
+export type Visibility = 'private' | 'public'
+
 export function createHost(
-  options: { targetScore?: number; rando?: boolean },
+  options: { targetScore?: number; rando?: boolean; visibility?: Visibility },
   onChange: (snapshot: HostSnapshot) => void,
 ) {
-  let code = makeRoomCode()
+  const visibility: Visibility = options.visibility ?? 'private'
+  // A public table takes one of the reserved codes so strangers can find it;
+  // a private one takes a random code that nobody can guess.
+  const freeSlots =
+    visibility === 'public'
+      ? PUBLIC_CODES.slice().sort(() => Math.random() - 0.5)
+      : []
+  let code = visibility === 'public' ? (freeSlots.shift() ?? makeRoomCode()) : makeRoomCode()
   let state = createGame(code, options)
   let peer: Peer | null = null
   let status: HostStatus = 'starting'
@@ -106,7 +146,25 @@ export function createHost(
   /** The first player to sit down runs the table, for as long as they are here. */
   let hostPlayerId: string | null = null
 
-  const connections = new Map<string, DataConnection>()
+  const connections = new Map<string, Channel>()
+
+  /**
+   * Whether the transport under a connection is still up. Browsers throttle
+   * timers in background tabs to a crawl, so a phone in a pocket stops
+   * pinging long before it has actually gone anywhere. The peer connection
+   * keeps telling the truth while the JavaScript on top of it is asleep.
+   */
+  function transportAlive(connection: Channel | undefined): boolean {
+    if (!connection?.open) return false
+    // An in-tab channel has no transport to check; being open is the whole story.
+    const pc = connection.peerConnection
+    if (!pc) return connection.open
+    return (
+      pc.connectionState === 'connected' ||
+      pc.iceConnectionState === 'connected' ||
+      pc.iceConnectionState === 'completed'
+    )
+  }
   /** When each phone last said anything. A dead phone stops saying things. */
   const lastSeen = new Map<string, number>()
 
@@ -173,6 +231,7 @@ export function createHost(
         if (isTableHost && state.phase === 'lobby') {
           if (message.targetScore) state.options.targetScore = message.targetScore
           if (message.rando !== undefined) state.options.rando = message.rando
+          if (message.meritocracy !== undefined) state.options.meritocracy = message.meritocracy
           if (message.deck) setDeck(state, message.deck)
         }
         break
@@ -187,11 +246,16 @@ export function createHost(
     broadcast()
   }
 
-  function accept(connection: DataConnection) {
+  /**
+   * Takes a seat on behalf of whatever is on the other end of `channel`.
+   * That is usually a phone across a WebRTC data channel, but when the person
+   * running the table is also playing it is a direct call in the same tab —
+   * the rules do not care which, so neither does this.
+   */
+  function attach(channel: Channel) {
     let playerId: string | null = null
 
-    connection.on('data', (raw) => {
-      const message = raw as ClientMessage
+    function receive(message: ClientMessage) {
       if (!message || typeof message.type !== 'string') return
       if (playerId) lastSeen.set(playerId, Date.now())
 
@@ -199,20 +263,20 @@ export function createHost(
         if (message.playerId === RANDO_ID) return
         const result = addPlayer(state, message.playerId, message.name)
         if (!result.ok) {
-          connection.send({ type: 'rejected', reason: result.reason } satisfies ServerMessage)
-          setTimeout(() => connection.close(), 250)
+          channel.send({ type: 'rejected', reason: result.reason } satisfies ServerMessage)
+          setTimeout(() => channel.close(), 250)
           return
         }
         playerId = message.playerId
         lastSeen.set(playerId, Date.now())
         // A phone that reloads replaces its own stale connection.
         const stale = connections.get(playerId)
-        if (stale && stale !== connection) stale.close()
-        connections.set(playerId, connection)
+        if (stale && stale !== channel) stale.close()
+        connections.set(playerId, channel)
         if (!hostPlayerId || !state.players.some((p) => p.id === hostPlayerId)) {
           hostPlayerId = playerId
         }
-        connection.send({
+        channel.send({
           type: 'welcome',
           self: selfView(state, playerId, tableHost()),
           table: tableView(state),
@@ -222,19 +286,27 @@ export function createHost(
       }
 
       if (playerId) handle(playerId, message)
-    })
+    }
 
-    const drop = () => {
+    function drop() {
       if (!playerId) return
       // Only forget the seat if this is still the live connection for it;
       // a reconnect will have replaced it already.
-      if (connections.get(playerId) === connection) {
+      if (connections.get(playerId) === channel) {
         connections.delete(playerId)
         lastSeen.delete(playerId)
       }
       setConnected(state, playerId, false)
       broadcast()
     }
+
+    return { receive, drop }
+  }
+
+  function accept(connection: DataConnection) {
+    const channel = fromDataConnection(connection)
+    const { receive, drop } = attach(channel)
+    connection.on('data', (raw) => receive(raw as ClientMessage))
     connection.on('close', drop)
     connection.on('error', drop)
   }
@@ -250,12 +322,20 @@ export function createHost(
     })
     peer.on('connection', accept)
     peer.on('error', (err: Error & { type?: string }) => {
-      // Another TV already has this code — take a different one.
-      if (err.type === 'unavailable-id' && attempt < 5) {
-        peer?.destroy()
-        code = makeRoomCode()
-        state.code = code
-        open(attempt + 1)
+      // Somebody already has this code. A private table just takes another;
+      // a public one works down its list of reserved tables until one is free.
+      if (err.type === 'unavailable-id' && attempt < PUBLIC_CODES.length + 5) {
+        const next = visibility === 'public' ? freeSlots.shift() : makeRoomCode()
+        if (next) {
+          peer?.destroy()
+          code = next
+          state.code = code
+          open(attempt + 1)
+          return
+        }
+        status = 'error'
+        error = 'Every public table is busy right now. Start a private one instead.'
+        emit()
         return
       }
       if (err.type === 'peer-unavailable') return
@@ -277,28 +357,63 @@ export function createHost(
    * this sweep the round would wait on it for the rest of the evening.
    */
   const sweep = setInterval(() => {
-    const cutoff = Date.now() - PLAYER_TIMEOUT_MS
+    const now = Date.now()
     let changed = false
     for (const player of state.players) {
       if (!player.connected) continue
-      const seen = lastSeen.get(player.id)
-      if (seen !== undefined && seen > cutoff) continue
-      connections.get(player.id)?.close()
+      const connection = connections.get(player.id)
+      const silent = now - (lastSeen.get(player.id) ?? 0)
+      // A phone that has stopped talking but whose channel is still up gets
+      // the benefit of the doubt for a while; one whose channel has gone does not.
+      const patience = transportAlive(connection) ? AWAY_GRACE_MS : PLAYER_TIMEOUT_MS
+      if (silent < patience) continue
+      connection?.close()
       connections.delete(player.id)
       lastSeen.delete(player.id)
       setConnected(state, player.id, false)
       changed = true
     }
     if (changed) broadcast()
-  }, PLAYER_TIMEOUT_MS / 4)
+  }, 2500)
 
   open()
   emit()
 
   return {
+    visibility,
     get snapshot(): HostSnapshot {
       return { status, code, error, table: tableView(state) }
     },
+    /**
+     * Sits the person running the table down as a player, without a round
+     * trip through the network. Used when there is no TV in the room and the
+     * host is playing along on the same device.
+     */
+    joinHere(onMessage: (message: ServerMessage) => void) {
+      let open = true
+      const channel: Channel = {
+        get open() {
+          return open
+        },
+        send: (message) => {
+          if (open) onMessage(message)
+        },
+        close: () => {
+          open = false
+        },
+      }
+      const { receive, drop } = attach(channel)
+      return {
+        send: (message: ClientMessage) => {
+          if (open) receive(message)
+        },
+        close: () => {
+          open = false
+          drop()
+        },
+      }
+    },
+
     /** TV-side controls, for a table driven by a keyboard or a remote. */
     startGame() {
       startGame(state)
@@ -312,10 +427,16 @@ export function createHost(
       playAgain(state)
       broadcast()
     },
-    setOptions(next: { targetScore?: number; rando?: boolean; deck?: DeckMode }) {
+    setOptions(next: {
+      targetScore?: number
+      rando?: boolean
+      meritocracy?: boolean
+      deck?: DeckMode
+    }) {
       if (state.phase !== 'lobby') return
       if (next.targetScore) state.options.targetScore = next.targetScore
       if (next.rando !== undefined) state.options.rando = next.rando
+      if (next.meritocracy !== undefined) state.options.meritocracy = next.meritocracy
       if (next.deck) setDeck(state, next.deck)
       broadcast()
     },

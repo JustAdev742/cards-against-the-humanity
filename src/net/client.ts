@@ -1,27 +1,17 @@
 import Peer, { type DataConnection } from 'peerjs'
 
 import { CONNECTION_HELP, peerOptions } from './peer.ts'
+import { applyServerMessage, emptySeat, type SeatSnapshot, type SeatStatus } from './seat.ts'
 import {
   HOST_TIMEOUT_MS,
   PING_EVERY_MS,
   peerIdForRoom,
   type ClientMessage,
-  type SelfView,
   type ServerMessage,
-  type TableView,
 } from './protocol.ts'
 
-export type ClientStatus = 'connecting' | 'connected' | 'reconnecting' | 'rejected' | 'error'
-
-export interface ClientSnapshot {
-  status: ClientStatus
-  table: TableView | null
-  self: SelfView | null
-  /** A message about the connection itself — shown as a banner. */
-  notice: string | null
-  /** A message about the last move — shown next to the hand, then cleared. */
-  moveError: string | null
-}
+export type ClientStatus = SeatStatus
+export type ClientSnapshot = SeatSnapshot
 
 const MAX_RETRIES = 8
 
@@ -43,22 +33,19 @@ export function createClient(
   let heartbeat: ReturnType<typeof setInterval> | null = null
   let watchdog: ReturnType<typeof setInterval> | null = null
   let lastHeard = Date.now()
+  let onVisible: (() => void) | null = null
 
   /** Stops talking to a connection we are about to give up on. */
   function stopTimers() {
     if (heartbeat) clearInterval(heartbeat)
     if (watchdog) clearInterval(watchdog)
+    if (onVisible) document.removeEventListener('visibilitychange', onVisible)
     heartbeat = null
     watchdog = null
+    onVisible = null
   }
 
-  const snapshot: ClientSnapshot = {
-    status: 'connecting',
-    table: null,
-    self: null,
-    notice: null,
-    moveError: null,
-  }
+  const snapshot: ClientSnapshot = emptySeat()
 
   const emit = () => onChange({ ...snapshot })
 
@@ -106,37 +93,20 @@ export function createClient(
         watchdog = setInterval(() => {
           if (Date.now() - lastHeard > HOST_TIMEOUT_MS) scheduleRetry('Lost the table.')
         }, PING_EVERY_MS)
+
+        // Coming back to the tab is the moment to prove this phone is still
+        // here, before a sweep on the table decides otherwise.
+        onVisible = () => {
+          if (document.visibilityState !== 'visible') return
+          lastHeard = Date.now()
+          if (connection?.open) connection.send({ type: 'ping' } satisfies ClientMessage)
+        }
+        document.addEventListener('visibilitychange', onVisible)
       })
 
       connection.on('data', (raw) => {
-        const message = raw as ServerMessage
         lastHeard = Date.now()
-        switch (message.type) {
-          case 'pong':
-            return
-          case 'welcome':
-            snapshot.self = message.self
-            snapshot.table = message.table
-            snapshot.status = 'connected'
-            snapshot.notice = null
-            break
-          case 'table':
-            snapshot.table = message.table
-            break
-          case 'self':
-            snapshot.self = message.self
-            break
-          case 'error':
-            snapshot.moveError = message.message
-            break
-          case 'rejected':
-            snapshot.status = 'rejected'
-            snapshot.notice =
-              message.reason === 'full'
-                ? 'That table is full. Ten players is the limit.'
-                : 'Someone at this table already goes by that name. Pick another.'
-            break
-        }
+        applyServerMessage(snapshot, raw as ServerMessage)
         emit()
       })
 

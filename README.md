@@ -9,6 +9,25 @@ cards, transcribed from the official PDF.
 
 **Play it:** <https://joviangame.me/cards-against-the-humanity/>
 
+## Two ways to play
+
+**Local.** Put it on the TV, hand out the four-letter code, everyone plays from
+their phone. The TV shows the black card and the answers; the phones are hands.
+This is the good one.
+
+**Online.** No TV, nobody in the same room. One person opens a table and the
+table lives on their device; everyone else joins from wherever they are, and
+the black card, the answers and your own hand all sit on one screen.
+
+| Online | What it does |
+| --- | --- |
+| Private match | Opens a table and gives you a code and a link to send. Nobody can wander in. |
+| Public match | Looks for a table with strangers at it. If none is running, opens one for others to find. |
+
+Public tables live on a handful of reserved codes. There is no server keeping a
+directory, so finding a game means knocking on those doors a few at a time — the
+same trick that lets the whole thing run without a backend.
+
 ## How a game goes
 
 1. Open the site on whatever is plugged into the TV and pick **I'm the TV**.
@@ -35,27 +54,34 @@ All of them live in the lobby, on the TV or on the first player's phone.
 
 | Setting | Options | Notes |
 | --- | --- | --- |
-| Deck | Full · Family | Family is the printed deck with the adult cards removed. |
+| Deck | Full · Family Edition | Two separate printed boxes. |
 | Play to | 5 · 7 · 10 | Roughly a quarter hour, half an hour, a whole evening. |
 | Rando Cardrissian | Off · On | A random card plays every round. If it wins, everyone should feel bad. |
+| Meritocracy | Off · On | The winner judges the next round instead of the job going round the table. |
 | Music | Volume, mute, track | TV only. See below. |
 
 ### Two decks
 
 | Deck | Cards | For |
 | --- | --- | --- |
-| Full | 500 white, 100 black | The game as printed. Adults. |
-| Family | 237 white, 84 black | About twelve and up. |
+| Full | 500 white, 100 black | The original game, as printed. Adults. |
+| Family Edition | 500 white, 95 black | Its own box, written for kids. Ages 8 and up. |
 
-The family deck removes the adult cards rather than bleeping them: a starred-out
-word is not a joke any more, so those cards are simply never dealt. Anything
-sexual, any drug reference, any slur, and the cards about suicide, self-harm and
-real atrocities are all out. What is left is the absurd half of the deck, which
-is most of what makes the game funny.
+These are two separate printed decks, not one box filtered into the other.
+Nothing is bleeped, blocked or held back: you pick which deck you are playing
+and you get all of it. Both were transcribed from Cards Against Humanity's own
+print-and-play PDFs.
 
-`test/engine.test.ts` enforces this: every family card has to exist in the
-printed deck, the deck has to be big enough for ten players, and no family card
-may match a list of adult terms. If a card is ever misfiled, the tests fail.
+The Family Edition is genuinely different rather than milder — its own jokes,
+its own recurring characters (Principal Butthead, Chungo, Sensei Todd), and a
+run of cards marked "written by a kid".
+
+### Whose turn it is
+
+The Card Czar passes round the table in seat order. **Winning a round does not
+make you the Czar** — that surprises people, so the winning card now says who
+judges next. If you would rather the winner judged, turn on **Meritocracy** in
+the lobby; it is one of the printed house rules.
 
 ## Sound
 
@@ -125,6 +151,10 @@ npm run e2e       # plays a whole game in a real browser; needs a dev server
 including the deck switch. It needs `npx playwright install chromium` once, and
 a network path to the signalling broker, so it is kept out of CI.
 
+The unit tests cover the parts that do not need a browser: the rules, the two
+decks, turn order, and what happens when people's phones die at the worst
+possible moment (`test/resilience.test.ts`).
+
 ## Deploying
 
 The build is a static site with a relative base, so it works from any path.
@@ -155,14 +185,20 @@ src/
   data/          The decks. black.json and white.json are the printed deck;
                  family-*.json are allowlists of exact card text.
   game/          Rules. Pure functions, no network, no React.
-  net/           Host (TV), client (phone), and the message protocol.
+  net/           Host (the table), clients over WebRTC or in the same tab,
+                 public table discovery, and the message protocol.
   audio/         Music, synthesised cues, phone haptics.
   ui/            Cards, buttons, the code input, the settings controls.
-  screens/       Home, Tv, Phone.
+  screens/       Home and the menus, Tv, Phone, Online.
 ```
 
 The rules layer knows nothing about the network, and the network layer knows
 nothing about React, so the whole game can be played out in tests.
+
+A seat talks to the table through one small message protocol. Online, the
+person running the table is also sitting at it, so their seat is wired straight
+into the host in the same tab — the player screen cannot tell the difference,
+which is why there is only one of them.
 
 ### What loads when
 
@@ -180,6 +216,12 @@ it is not using.
 - **WebRTC needs to get through.** On most home wifi this is fine. On a locked
   down corporate or guest network the phones may not reach the TV, since there
   is no TURN relay configured.
+- **A phone that dies takes up to 25 seconds to be noticed.** WebRTC holds a
+  connection open long after the browser behind it has gone, and a locked phone
+  looks much the same as a dead one, so the table waits a little before playing
+  on without somebody. Seats and scores are kept either way.
+- **Public tables are limited by how many reserved codes there are.** Twenty-one
+  at a time. If they are all busy, open a private one.
 - **The public signalling broker is free and occasionally busy.** If a table
   will not open, reload. The TV takes a new code automatically if the one it
   picked is taken.

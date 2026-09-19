@@ -15,7 +15,7 @@ import { CodeInput } from '../ui/CodeInput.tsx'
 import { PlayerChip, PlayerDot } from '../ui/PlayerChip.tsx'
 import { SoundToggle } from '../ui/SoundControls.tsx'
 
-export function Phone(props: { initialCode: string; onExit: () => void }) {
+export function Phone(props: { initialCode: string; hint?: string; onExit: () => void }) {
   return (
     <FeedbackProvider>
       <PhoneSeat {...props} />
@@ -23,7 +23,15 @@ export function Phone(props: { initialCode: string; onExit: () => void }) {
   )
 }
 
-function PhoneSeat({ initialCode, onExit }: { initialCode: string; onExit: () => void }) {
+function PhoneSeat({
+  initialCode,
+  hint,
+  onExit,
+}: {
+  initialCode: string
+  hint?: string
+  onExit: () => void
+}) {
   // A phone that reloads mid-game — or that the browser quietly reloaded in a
   // background tab — already knows the table and the name. Making someone tap
   // through the form again while a round is waiting on them is not a welcome.
@@ -44,6 +52,7 @@ function PhoneSeat({ initialCode, onExit }: { initialCode: string; onExit: () =>
     return (
       <JoinForm
         initialCode={initialCode}
+        hint={hint}
         notice={snapshot?.status === 'rejected' ? snapshot.notice : null}
         onJoin={(code, name) => {
           rememberName(name)
@@ -69,7 +78,7 @@ function PhoneSeat({ initialCode, onExit }: { initialCode: string; onExit: () =>
   )
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+export function Shell({ children }: { children: React.ReactNode }) {
   return <main className="flex min-h-dvh flex-col bg-ink">{children}</main>
 }
 
@@ -77,11 +86,13 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 function JoinForm({
   initialCode,
+  hint,
   notice,
   onJoin,
   onExit,
 }: {
   initialCode: string
+  hint?: string
   notice: string | null
   onJoin: (code: string, name: string) => void
   onExit: () => void
@@ -131,7 +142,9 @@ function JoinForm({
       >
         <div>
           <h1 className="m-0 text-3xl font-extrabold tracking-[-0.03em]">Join the table</h1>
-          <p className="m-0 mt-2 text-ash-bright">The four letters are on the TV.</p>
+          <p className="m-0 mt-2 text-ash-bright">
+            {hint ?? 'The four letters are on the TV.'}
+          </p>
         </div>
 
         {notice && (
@@ -201,7 +214,8 @@ function Connecting({ notice, onExit }: { notice: string; onExit: () => void }) 
 
 /* ── At the table ───────────────────────────────────────────── */
 
-function Seat({
+/** The player's whole view of a table, wherever the table is being run. */
+export function Seat({
   snapshot,
   client,
   table,
@@ -368,6 +382,18 @@ function PhoneLobby({
               Deal in Rando Cardrissian: a random card plays every round. If it wins,
               everyone should feel bad.
             </label>
+            <label className="flex cursor-pointer items-start gap-3 text-sm text-ash-bright">
+              <input
+                type="checkbox"
+                checked={table.meritocracy}
+                onChange={(event) =>
+                  client?.send({ type: 'setOptions', meritocracy: event.target.checked })
+                }
+                className="mt-0.5 h-5 w-5 accent-white"
+              />
+              Meritocracy: whoever wins a round judges the next one, instead of the job
+              going round the table.
+            </label>
             <Button
               disabled={short > 0}
               onClick={() => {
@@ -380,7 +406,7 @@ function PhoneLobby({
           </>
         ) : (
           <p className="m-0 text-sm text-ash">
-            {table.deck === 'family' ? 'Family deck' : 'Full deck'}: {table.deckCounts.white} white
+            {table.deck === 'family' ? 'Family Edition' : 'Full deck'}: {table.deckCounts.white} white
             cards, {table.deckCounts.black} black. Playing to {table.targetScore}.
           </p>
         )}
@@ -573,21 +599,54 @@ function PhoneJudging({
 
   if (!self.isCzar) {
     return (
-      <div className="flex flex-1 flex-col gap-5 px-5 py-6">
-        <p className="label">The Czar is reading them out</p>
-        {table.black && <BlackCardFace card={table.black} scale="1.25rem" className="min-h-32 p-4" />}
-        {self.submitted && (
-          <>
-            <p className="label">Yours</p>
-            <ul className="flex flex-col gap-3">
-              {self.submitted.map((card, index) => (
-                <li key={index}>
-                  <WhiteCard text={card} scale="1.1rem" className="min-h-24 p-4" />
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0 px-4 pt-4">
+          {table.black && (
+            <BlackCardFace
+              card={table.black}
+              fills={table.revealed.at(-1)?.cards}
+              scale="1.25rem"
+              className="min-h-32 p-4"
+            />
+          )}
+        </div>
+        <p className="label shrink-0 px-5 pt-4">
+          {table.allRevealed
+            ? 'The Czar is choosing'
+            : `${table.revealed.length} of ${table.submissionCount} read out`}
+        </p>
+        {/* Once a card is face up it is public: on a TV the whole room can see
+            it, so online everyone gets it on their own screen too. */}
+        <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-3">
+          {table.revealed.map((submission) => {
+            const mine = submission.playerId === self.playerId
+            return (
+              <li key={submission.playerId} className="pb-5">
+                <div className="flex flex-col gap-1.5">
+                  {submission.cards.map((card, index) => (
+                    <WhiteCard
+                      key={index}
+                      text={card}
+                      scale="1.15rem"
+                      className={
+                        'min-h-24 p-4 ' +
+                        (mine ? 'outline outline-2 outline-offset-[5px] outline-ash' : '')
+                      }
+                      footer={
+                        mine && index === submission.cards.length - 1 ? (
+                          <span className="label text-[0.55em]! text-ash-ink!">Yours</span>
+                        ) : null
+                      }
+                    />
+                  ))}
+                </div>
+              </li>
+            )
+          })}
+          {table.revealed.length === 0 && (
+            <li className="text-sm text-ash">Nothing turned over yet.</li>
+          )}
+        </ul>
       </div>
     )
   }
@@ -721,6 +780,7 @@ function PhoneRoundEnd({
 }) {
   const isRando = table.winnerId === RANDO_ID
   const winner = table.players.find((p) => p.id === table.winnerId)
+  const nextUp = table.players.find((p) => p.id === table.nextCzarId)
   const youWon = table.winnerId === self.playerId
 
   return (
@@ -738,6 +798,11 @@ function PhoneRoundEnd({
         {winner && !isRando && <PlayerDot player={winner} />}
         {isRando ? 'Rando Cardrissian wins it.' : `${winner?.name ?? 'Nobody'} takes the point.`}
       </p>
+      {nextUp && (
+        <p className="label m-0">
+          {nextUp.id === self.playerId ? 'You judge the next round' : `${nextUp.name} judges next`}
+        </p>
+      )}
       {(self.isCzar || self.isHost) && (
         <Button className="mt-auto w-full" onClick={() => client?.send({ type: 'nextRound' })}>
           Next round

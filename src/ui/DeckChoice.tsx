@@ -3,13 +3,13 @@ import { useId } from 'react'
 import type { DeckMode } from '../game/types.ts'
 
 /**
- * Two decks, one choice. The family deck is the printed deck with the adult
- * cards removed rather than bleeped: a starred-out word is not a joke, so the
- * card does not get dealt at all. Everything that is left is the real game.
+ * Two boxes, not one box filtered. The Family Edition is its own printed deck
+ * with its own jokes, written for a table with kids at it — so nothing here is
+ * bleeped or held back; you simply pick which deck you are playing.
  */
 const OPTIONS: { value: DeckMode; label: string; detail: string }[] = [
-  { value: 'full', label: 'Full deck', detail: 'Everything in the box. Adults only.' },
-  { value: 'family', label: 'Family deck', detail: 'Fine for about twelve and up.' },
+  { value: 'full', label: 'Full deck', detail: 'The original. Adults.' },
+  { value: 'family', label: 'Family Edition', detail: 'Its own deck. Ages 8 and up.' },
 ]
 
 export function DeckChoice({
@@ -77,7 +77,7 @@ export function DeckChoice({
         aria-live="polite"
       >
         {counts.white} white cards and {counts.black} black cards in play.
-        {value === 'family' && ' Sex, drugs and slurs are taken out, not bleeped.'}
+        {value === 'family' && ' Cards Against Humanity’s own Family Edition, card for card.'}
       </p>
     </fieldset>
   )
