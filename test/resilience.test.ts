@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  addBot,
   addPlayer,
   allRevealed,
   chooseWinner,
@@ -16,6 +17,7 @@ import {
   setConnected,
   startGame,
 } from '../src/game/engine.ts'
+import { shouldDrop } from '../src/net/liveness.ts'
 import type { GameState } from '../src/game/types.ts'
 
 const SEED = 4242
@@ -287,4 +289,43 @@ test('playing the same card twice in one round is refused', () => {
 
   assert.equal(result.ok, false, 'one card cannot fill two blanks')
   assert.equal(ben.hand.length, 10, 'a refused play costs nothing')
+})
+
+/* ── The table does not sweep away its own bots ─────────────────
+   Bots never send a message, so they are permanently "silent". An earlier
+   version of the sweep dropped them a few seconds after they sat down,
+   which emptied the table mid-round and put up the short-handed banner. */
+
+test('a bot is never dropped for going quiet, however long it has been', () => {
+  const bot = { connected: true, bot: 'pip' as const }
+  for (const silent of [0, 10_000, 60_000, 5 * 60_000]) {
+    for (const alive of [true, false]) {
+      assert.equal(shouldDrop(bot, silent, alive), false, `swept a bot after ${silent}ms`)
+    }
+  }
+})
+
+test('a phone is dropped fast when its channel has gone, slowly when it has not', () => {
+  const phone = { connected: true, bot: undefined }
+  assert.equal(shouldDrop(phone, 3_000, false), false, 'a blip is not a disconnect')
+  assert.equal(shouldDrop(phone, 11_000, false), true, 'a dead channel gets no patience')
+  assert.equal(shouldDrop(phone, 11_000, true), false, 'an open channel gets the benefit of the doubt')
+  assert.equal(shouldDrop(phone, 30_000, true), true, 'but not forever')
+})
+
+test('a seat already marked gone is not swept a second time', () => {
+  assert.equal(shouldDrop({ connected: false, bot: undefined }, 9e9, false), false)
+})
+
+test('a table of one human and two bots is not short-handed', () => {
+  const state = tableOf(['Ada'])
+  addBot(state, 'pip', 'Pip')
+  addBot(state, 'nadia', 'Nadia')
+  assert.equal(isShortHanded(state), false, 'three seated players is a game')
+  startGame(state)
+  assert.equal(state.phase, 'writing')
+  // And it stays a game across a round, which is where the sweep used to bite.
+  everyonePlays(state)
+  assert.equal(state.phase, 'judging')
+  assert.equal(isShortHanded(state), false)
 })

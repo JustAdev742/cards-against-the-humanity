@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react'
  */
 export function ConfirmButton({
   label,
+  name,
   confirmLabel,
   onConfirm,
   className = '',
@@ -15,6 +16,9 @@ export function ConfirmButton({
   timeoutMs = 4000,
 }: {
   label: string
+  /** What this button acts on, when the visible label alone is ambiguous —
+   *  a list of "Remove" buttons reads as one repeated word otherwise. */
+  name?: string
   confirmLabel: string
   onConfirm: () => void
   className?: string
@@ -44,7 +48,9 @@ export function ConfirmButton({
         }
       }}
       onBlur={() => setArmed(false)}
-      aria-live="polite"
+      // The accessible name carries the armed state rather than a live region:
+      // aria-live on the control the reader is already focused on double-speaks.
+      aria-label={name ? (armed ? `${name}. Tap again to confirm.` : name) : undefined}
       className={`${className} ${armed ? armedClassName : ''}`}
     >
       {armed ? confirmLabel : label}

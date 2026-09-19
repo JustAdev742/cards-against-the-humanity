@@ -41,6 +41,7 @@ export function PlayerChip({
 }) {
   const label = [
     player.name,
+    player.botBlurb ? 'a bot' : null,
     showScore ? `${player.score} ${player.score === 1 ? 'point' : 'points'}` : null,
     player.isCzar ? 'Card Czar' : null,
     player.connected ? null : 'disconnected',
@@ -62,6 +63,14 @@ export function PlayerChip({
         >
           {player.name}
         </span>
+        {player.botBlurb && (
+          <span
+            aria-hidden
+            className="label shrink-0 rounded border border-line px-1.5 py-0.5 text-[0.55em]! leading-none"
+          >
+            Bot
+          </span>
+        )}
         {showScore && (
           <span className={`mono tabular-nums text-ash-bright ${size === 'lg' ? 'text-2xl' : ''}`}>
             {player.score}

@@ -56,6 +56,7 @@ export type ClientMessage =
       deck?: DeckMode
     }
   | { type: 'kick'; playerId: string }
+  | { type: 'addBot' }
   | { type: 'ping' }
 
 /* ── TV → phone ─────────────────────────────────────────────── */
@@ -66,6 +67,8 @@ export interface PlayerView {
   score: number
   connected: boolean
   color: number
+  /** What sort of player this is, in one line. Null for a person. */
+  botBlurb: string | null
   /** True once this player has handed in their cards for the round. */
   played: boolean
   isCzar: boolean
@@ -103,6 +106,8 @@ export interface TableView {
   waitingOn: string[]
   /** Fewer players here than a game needs. The round is waiting, not over. */
   shortHanded: boolean
+  /** True while there is still a personality left to seat. */
+  canAddBot: boolean
 }
 
 export interface SelfView {

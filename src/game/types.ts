@@ -22,7 +22,15 @@ export interface Player {
   /** Index into the player colour ramp; stable for the whole game. */
   color: number
   hand: string[]
+  /** Which sort of player this is. A bot has no phone to lose. */
+  bot?: BotKind
 }
+
+/** The name of a bot's taste, as defined in src/bots. */
+export type BotKind = string
+
+export const BOT_PREFIX = 'bot:'
+export const isBot = (id: string): boolean => id.startsWith(BOT_PREFIX)
 
 export interface Submission {
   playerId: string

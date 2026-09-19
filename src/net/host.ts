@@ -1,10 +1,11 @@
 import Peer, { type DataConnection } from 'peerjs'
 
 import {
+  PUBLIC_CODES,
+  addBot,
   addPlayer,
   chooseWinner,
   createGame,
-  PUBLIC_CODES,
   deckCounts,
   isShortHanded,
   makeRoomCode,
@@ -19,11 +20,12 @@ import {
   setDeck,
   startGame,
 } from '../game/engine.ts'
-import { RANDO_ID, type DeckMode, type GameState } from '../game/types.ts'
+import { MAX_PLAYERS, MIN_PLAYERS, RANDO_ID, type DeckMode, type GameState } from '../game/types.ts'
+import { PERSONALITIES, personalityFor } from '../bots/taste.ts'
+import { createBots } from './botRunner.ts'
+import { shouldDrop } from './liveness.ts'
 import { peerOptions } from './peer.ts'
 import {
-  AWAY_GRACE_MS,
-  PLAYER_TIMEOUT_MS,
   peerIdForRoom,
   type ClientMessage,
   type SelfView,
@@ -90,6 +92,7 @@ export function tableView(state: GameState): TableView {
       score: p.score,
       connected: p.connected,
       color: p.color,
+      botBlurb: p.bot ? personalityFor(p.bot).blurb : null,
       played: state.submissions.some((s) => s.playerId === p.id),
       isCzar: p.id === state.czarId,
     })),
@@ -106,6 +109,9 @@ export function tableView(state: GameState): TableView {
     deckCounts: deckCounts(state.options.deck),
     waitingOn: pendingPlayers(state).map((p) => p.name),
     shortHanded: isShortHanded(state),
+    canAddBot:
+      state.players.length < MAX_PLAYERS &&
+      PERSONALITIES.some((k) => !state.players.some((p) => p.bot === k.kind)),
   }
 }
 
@@ -167,6 +173,36 @@ export function createHost(
   }
   /** When each phone last said anything. A dead phone stops saying things. */
   const lastSeen = new Map<string, number>()
+  /** Bots this table seated by itself, which people are welcome to replace. */
+  const autoBots = new Set<string>()
+
+  /**
+   * Seats a bot with a personality nobody at this table has yet, so the bots
+   * disagree with each other rather than all playing the same card.
+   */
+  function seatBot() {
+    const taken = new Set(state.players.map((p) => p.bot).filter(Boolean))
+    const free = PERSONALITIES.filter((p) => !taken.has(p.kind))
+    if (free.length === 0) return null
+    const choice = free[Math.floor(Math.random() * free.length)]
+    return addBot(state, choice.kind, choice.name)
+  }
+
+  const bots = createBots({
+    play(botId, cards) {
+      playCards(state, botId, cards)
+      broadcast()
+    },
+    reveal() {
+      revealNext(state)
+      broadcast()
+    },
+    choose(botId, winnerId) {
+      if (state.czarId !== botId) return
+      chooseWinner(state, winnerId)
+      broadcast()
+    },
+  })
 
   /**
    * Whoever is running the table right now. The job follows the first player
@@ -195,6 +231,7 @@ export function createHost(
       connection.send({ type: 'table', table } satisfies ServerMessage)
       connection.send({ type: 'self', self: selfView(state, playerId, host) })
     }
+    bots.sync(state)
     emit()
   }
 
@@ -234,6 +271,9 @@ export function createHost(
           if (message.meritocracy !== undefined) state.options.meritocracy = message.meritocracy
           if (message.deck) setDeck(state, message.deck)
         }
+        break
+      case 'addBot':
+        if (isTableHost && state.phase === 'lobby') seatBot()
         break
       case 'kick':
         if (isTableHost && message.playerId !== playerId) {
@@ -360,13 +400,9 @@ export function createHost(
     const now = Date.now()
     let changed = false
     for (const player of state.players) {
-      if (!player.connected) continue
       const connection = connections.get(player.id)
       const silent = now - (lastSeen.get(player.id) ?? 0)
-      // A phone that has stopped talking but whose channel is still up gets
-      // the benefit of the doubt for a while; one whose channel has gone does not.
-      const patience = transportAlive(connection) ? AWAY_GRACE_MS : PLAYER_TIMEOUT_MS
-      if (silent < patience) continue
+      if (!shouldDrop(player, silent, transportAlive(connection))) continue
       connection?.close()
       connections.delete(player.id)
       lastSeen.delete(player.id)
@@ -376,6 +412,63 @@ export function createHost(
     if (changed) broadcast()
   }, 2500)
 
+  /**
+   * The winning card holds the screen for a beat and then the next round
+   * deals. This lives on the table rather than on the TV, because an online
+   * game has no TV and would otherwise sit on the winner until somebody
+   * remembered to press the button.
+   */
+  const WINNER_DWELL_MS = 7000
+  let dwellFrom = -1
+  const dwell = setInterval(() => {
+    if (destroyed || state.phase !== 'roundEnd') {
+      if (state.phase !== 'roundEnd') dwellFrom = -1
+      return
+    }
+    if (dwellFrom === -1) {
+      dwellFrom = Date.now()
+      return
+    }
+    if (Date.now() - dwellFrom < WINNER_DWELL_MS) return
+    dwellFrom = -1
+    nextRound(state)
+    broadcast()
+  }, 1000)
+
+  /**
+   * A public table with one person at it is not a game. After a short wait
+   * the table seats bots so they can actually play — and gives those seats
+   * straight back when real people turn up. Private and local tables never
+   * do this: somebody chose who is at those.
+   */
+  const AUTO_FILL_AFTER_MS = 20000
+  let waitingSince = 0
+  const autofill = setInterval(() => {
+    if (destroyed || visibility !== 'public' || state.phase !== 'lobby') return
+    const humans = state.players.filter((p) => !p.bot && p.connected).length
+    if (humans === 0) {
+      waitingSince = 0
+      return
+    }
+    if (!waitingSince) waitingSince = Date.now()
+
+    let changed = false
+    while (autoBots.size > 0 && state.players.length > MIN_PLAYERS) {
+      const [id] = [...autoBots].slice(-1)
+      autoBots.delete(id)
+      removePlayer(state, id)
+      changed = true
+    }
+    if (Date.now() - waitingSince >= AUTO_FILL_AFTER_MS && state.players.length < MIN_PLAYERS) {
+      const bot = seatBot()
+      if (bot) {
+        autoBots.add(bot.id)
+        changed = true
+      }
+    }
+    if (changed) broadcast()
+  }, 4000)
+
   open()
   emit()
 
@@ -384,6 +477,12 @@ export function createHost(
     get snapshot(): HostSnapshot {
       return { status, code, error, table: tableView(state) }
     },
+    /** Seats one more bot, from the TV's own controls. */
+    addBot() {
+      seatBot()
+      broadcast()
+    },
+
     /**
      * Sits the person running the table down as a player, without a round
      * trip through the network. Used when there is no TV in the room and the
@@ -443,6 +542,9 @@ export function createHost(
     destroy() {
       destroyed = true
       clearInterval(sweep)
+      clearInterval(autofill)
+      clearInterval(dwell)
+      bots.destroy()
       for (const connection of connections.values()) connection.close()
       connections.clear()
       peer?.destroy()

@@ -22,9 +22,6 @@ import { PlayerChip, PlayerDot, playerColor } from '../ui/PlayerChip.tsx'
 import { MuteButton, SoundControls } from '../ui/SoundControls.tsx'
 import { TargetScore } from '../ui/TargetScore.tsx'
 
-/** How long the winning card stays up before the next round deals. */
-const WINNER_DWELL_MS = 7000
-
 export function Tv({ onExit }: { onExit: () => void }) {
   const { snapshot, host } = useHost({ targetScore: 7, rando: false })
   const music = useMusic()
@@ -61,13 +58,6 @@ function TvTable({
   music: Music
   onExit: () => void
 }) {
-  // The winning card holds the screen for a beat, then the next round deals.
-  useEffect(() => {
-    if (table.phase !== 'roundEnd') return
-    const timer = setTimeout(() => host?.nextRound(), WINNER_DWELL_MS)
-    return () => clearTimeout(timer)
-  }, [table.phase, table.round, host])
-
   // Sound follows the table rather than the clicks, so it fires for whatever
   // the phones did, not just for what happened on this screen.
   const previous = useRef({ phase: table.phase, played: 0, revealed: 0, players: 0 })
@@ -308,6 +298,11 @@ function Lobby({
                     className="text-[min(2.2vw,2rem)]"
                   >
                     <PlayerChip player={player} showScore={false} size="lg" />
+                    {player.botBlurb && (
+                      <p className="m-0 ml-[3.4vw] text-[min(1.2vw,1rem)] text-ash">
+                        {player.botBlurb}
+                      </p>
+                    )}
                   </motion.li>
                 ))}
               </AnimatePresence>
@@ -337,17 +332,34 @@ function Lobby({
 
         <div className="border-t border-line pt-[2vh]">
           {short > 0 ? (
-            <p className="m-0 text-[min(1.7vw,1.4rem)] font-bold text-ash-bright">
-              {short} more {short === 1 ? 'player' : 'players'} and you can start.
-            </p>
+            <div className="flex flex-wrap items-center gap-4">
+              <p className="m-0 text-[min(1.7vw,1.4rem)] font-bold text-ash-bright">
+                {short} more {short === 1 ? 'player' : 'players'} and you can start.
+              </p>
+              {table.canAddBot && (
+                <Button
+                  variant="secondary"
+                  onClick={() => host?.addBot()}
+                  className="min-h-[6vh]! text-[min(1.5vw,1.2rem)]!"
+                >
+                  Add a bot
+                </Button>
+              )}
+            </div>
           ) : (
             <div className="flex flex-wrap items-center gap-4">
               <Button onClick={() => host?.startGame()} className="min-h-[6vh]! text-[min(1.6vw,1.3rem)]!">
                 Start the game
               </Button>
-              <p className="m-0 text-[min(1.3vw,1.05rem)] text-ash">
-                The first player in can also start it from their phone.
-              </p>
+              {table.canAddBot && (
+                <Button
+                  variant="secondary"
+                  onClick={() => host?.addBot()}
+                  className="min-h-[6vh]! text-[min(1.5vw,1.2rem)]!"
+                >
+                  Add a bot
+                </Button>
+              )}
             </div>
           )}
           <div className="mt-[1.6vh] flex flex-col gap-[1vh]">

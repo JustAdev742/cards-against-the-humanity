@@ -58,6 +58,7 @@ All of them live in the lobby, on the TV or on the first player's phone.
 | Play to | 5 · 7 · 10 | Roughly a quarter hour, half an hour, a whole evening. |
 | Rando Cardrissian | Off · On | A random card plays every round. If it wins, everyone should feel bad. |
 | Meritocracy | Off · On | The winner judges the next round instead of the job going round the table. |
+| Add a bot | Up to six | Seats a guest who plays and judges for itself. See below. |
 | Music | Volume, mute, track | TV only. See below. |
 
 ### Two decks
@@ -82,6 +83,64 @@ The Card Czar passes round the table in seat order. **Winning a round does not
 make you the Czar** — that surprises people, so the winning card now says who
 judges next. If you would rather the winner judged, turn on **Meritocracy** in
 the lobby; it is one of the printed house rules.
+
+## The bots
+
+Short of players, press **Add a bot** in the lobby. A bot takes a seat like
+anybody else: it is dealt a hand, it plays out of that hand, and when the Czar
+lands on it, it reads the answers and picks a winner. Nothing about the rules
+changes to accommodate it. A public table with too few people at it will seat
+one every twenty seconds or so, and gives the seat back as soon as a real
+person turns up.
+
+### They are not picking at random
+
+There is no table of pre-scored card combinations anywhere in this project, and
+deliberately so: a lookup table only knows the pairs somebody sat down and
+scored, and would have nothing to say about a card it had not seen. Instead a
+bot measures a few things it can work out about any pairing —
+
+- **Fit.** "I was bitten by a ___" plus "A bear." reads "a a bear". Blanks that
+  follow *a* or *the* are found by reading the setup, so this works on cards
+  nobody has written yet.
+- **Contrast.** Each card gets a vector over thirteen little worlds — school,
+  money, the body, the supernatural — and the distance between the setup's world
+  and the answer's is the engine of most of these jokes.
+- **Register.** How bodily it is, how crude, how abstract, how concrete
+  (proper nouns and numbers: things you can picture).
+- **Punch.** Short answers land harder after a long setup.
+- **Echo.** An answer that borrows the setup's own words back usually reads flat.
+
+Each bot weighs those differently, which is the whole point — a table where
+every bot plays the same card is not a game. Bex goes for the rudest thing in
+her hand; Wendell answers a lurid question with something painfully ordinary;
+Nadia wants the strangest and most specific card; Ozzy wants a name or a number;
+Hutch plays whatever reads best in the sentence; Pip is chaotic and will lose
+more than the others. They pick by a softmax over their best few cards rather
+than always taking the top one, so the same bot with the same hand does not
+play the same card twice.
+
+For a Pick 2 the holes are filled together rather than one at a time, because
+two answers out of the same world read as one flat idea.
+
+### They work out who they are playing with
+
+Every bot watches every verdict, including ones it was not part of, and compares
+the card that won against the cards that lost. What set the winner apart nudges
+what it believes about **that particular judge**, and only that judge. So if you
+keep rewarding the gross card, the bots will start handing you gross cards —
+even the ones who do not personally find it funny.
+
+The nudge is bounded, so a bot never entirely stops being itself, and it is
+forgotten when the table closes. Nothing is sent anywhere.
+
+Over three thousand simulated rounds, a bot that watches the judge beats an
+identical twin that does not by 56–80%, depending on the judge — and falls back
+to about 50% against Pip, who is genuinely unpredictable. That is the result you
+want: there is nothing to learn from a judge who is picking at random.
+
+Bots answer on a delay and pause entirely if every human has left, so a table
+nobody is sitting at does not quietly finish the game without you.
 
 ## Sound
 
@@ -182,9 +241,10 @@ To point at your own PeerJS broker instead of the public one, add
 
 ```
 src/
-  data/          The decks. black.json and white.json are the printed deck;
-                 family-*.json are allowlists of exact card text.
+  data/          The four decks, transcribed from the printed boxes:
+                 black/white.json and family-black/family-white.json.
   game/          Rules. Pure functions, no network, no React.
+  bots/          What a bot finds funny. Also pure, also testable.
   net/           Host (the table), clients over WebRTC or in the same tab,
                  public table discovery, and the message protocol.
   audio/         Music, synthesised cues, phone haptics.
@@ -211,6 +271,7 @@ it is not using.
 ## Known limits
 
 - **Three players minimum.** Two people cannot play: someone has to judge.
+  You can make up the numbers with bots.
 - **One player per browser profile.** Seats are keyed to `localStorage`, so two
   people on one phone would share a seat. In practice everyone has their own.
 - **WebRTC needs to get through.** On most home wifi this is fine. On a locked

@@ -3,9 +3,11 @@ import whiteCards from '../data/white.json' with { type: 'json' }
 import familyBlack from '../data/family-black.json' with { type: 'json' }
 import familyWhite from '../data/family-white.json' with { type: 'json' }
 import {
+  BOT_PREFIX,
   MAX_PLAYERS,
   MIN_PLAYERS,
   RANDO_ID,
+  type BotKind,
   type BlackCard,
   type DeckMode,
   type GameOptions,
@@ -211,6 +213,37 @@ export function isShortHanded(state: GameState): boolean {
   if (state.phase === 'lobby' || state.phase === 'gameOver') return false
   return state.players.filter((p) => p.connected).length < MIN_PLAYERS
 }
+
+/** Who the table is actually waiting on, leaving out anything automatic. */
+export const humansAtTable = (state: GameState): Player[] =>
+  state.players.filter((p) => !p.bot && p.connected)
+
+/**
+ * Sits a bot down. It takes a normal seat with a normal hand, because every
+ * rule in here should apply to it exactly as it applies to a person.
+ */
+export function addBot(state: GameState, kind: BotKind, name: string): Player | null {
+  if (state.players.length >= MAX_PLAYERS) return null
+  if (state.players.some((p) => p.name.toLowerCase() === name.toLowerCase())) return null
+
+  const used = new Set(state.players.map((p) => p.color))
+  let color = 0
+  while (used.has(color) && color < 7) color++
+
+  const player: Player = {
+    id: `${BOT_PREFIX}${kind}:${Math.random().toString(36).slice(2, 8)}`,
+    name,
+    score: 0,
+    connected: true,
+    color,
+    hand: state.phase === 'lobby' ? [] : drawWhite(state, state.options.handSize),
+    bot: kind,
+  }
+  state.players.push(player)
+  return player
+}
+
+export const botsAtTable = (state: GameState): Player[] => state.players.filter((p) => p.bot)
 
 export function setConnected(state: GameState, id: string, connected: boolean): GameState {
   const index = state.players.findIndex((p) => p.id === id)

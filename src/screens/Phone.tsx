@@ -345,10 +345,16 @@ function PhoneLobby({
       <ul className="flex flex-col gap-3">
         {table.players.map((player) => (
           <li key={player.id} className="flex items-center justify-between gap-3">
-            <PlayerChip player={player} showScore={false} />
+            <span className="min-w-0">
+              <PlayerChip player={player} showScore={false} />
+              {player.botBlurb && (
+                <span className="mt-0.5 block pl-[2.3rem] text-xs text-ash">{player.botBlurb}</span>
+              )}
+            </span>
             {self.isHost && player.id !== self.playerId && (
               <ConfirmButton
                 label="Remove"
+                name={`Remove ${player.name}`}
                 confirmLabel="Tap again"
                 onConfirm={() => client?.send({ type: 'kick', playerId: player.id })}
                 className="label min-h-11 cursor-pointer px-2 hover:text-danger!"
@@ -403,6 +409,17 @@ function PhoneLobby({
             >
               {short > 0 ? `Need ${short} more` : 'Start the game'}
             </Button>
+            {table.canAddBot && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  feedback.select()
+                  client?.send({ type: 'addBot' })
+                }}
+              >
+                Add a bot
+              </Button>
+            )}
           </>
         ) : (
           <p className="m-0 text-sm text-ash">
