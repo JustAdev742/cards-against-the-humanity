@@ -24,7 +24,13 @@ export function Phone(props: { initialCode: string; onExit: () => void }) {
 }
 
 function PhoneSeat({ initialCode, onExit }: { initialCode: string; onExit: () => void }) {
-  const [entry, setEntry] = useState<{ code: string; name: string } | null>(null)
+  // A phone that reloads mid-game — or that the browser quietly reloaded in a
+  // background tab — already knows the table and the name. Making someone tap
+  // through the form again while a round is waiting on them is not a welcome.
+  const [entry, setEntry] = useState<{ code: string; name: string } | null>(() => {
+    const name = rememberedName().trim()
+    return initialCode.length === 4 && name ? { code: initialCode, name } : null
+  })
   const { snapshot, client } = useClient(entry?.code ?? null, entry?.name ?? '')
 
   useWakeLock(snapshot?.status === 'connected')
@@ -250,6 +256,12 @@ function Seat({
           <SoundToggle on={feedback.soundOn} onToggle={feedback.toggleSound} className="-mr-2" />
         </div>
       </header>
+
+      {table.shortHanded && snapshot.status === 'connected' && (
+        <p role="status" className="m-0 bg-paper px-4 py-2 text-center text-sm font-bold text-ink">
+          Waiting for more players. Nothing is lost.
+        </p>
+      )}
 
       {snapshot.status !== 'connected' && (
         <p role="status" className="m-0 bg-paper px-4 py-2 text-center text-sm font-bold text-ink">

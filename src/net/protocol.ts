@@ -8,6 +8,18 @@ import type { BlackCard, DeckMode, Phase } from '../game/types.ts'
 
 export const PROTOCOL_VERSION = 1
 
+/* ── Liveness ───────────────────────────────────────────────────
+   A phone that dies does not get to say goodbye. WebRTC will happily
+   hold a connection open long after the browser behind it is gone, so
+   both ends watch the clock instead of waiting for an event. */
+
+/** How often a phone says it is still here. */
+export const PING_EVERY_MS = 3000
+/** Silence from a phone for this long and the table plays on without it. */
+export const PLAYER_TIMEOUT_MS = 10000
+/** Silence from the TV for this long and the phone starts reconnecting. */
+export const HOST_TIMEOUT_MS = 12000
+
 /** The peer id a TV listens on for a given room code. */
 export function peerIdForRoom(code: string): string {
   return `cath-v${PROTOCOL_VERSION}-${code.toUpperCase()}`
@@ -25,6 +37,7 @@ export type ClientMessage =
   | { type: 'playAgain' }
   | { type: 'setOptions'; targetScore?: number; rando?: boolean; deck?: DeckMode }
   | { type: 'kick'; playerId: string }
+  | { type: 'ping' }
 
 /* ── TV → phone ─────────────────────────────────────────────── */
 
@@ -66,6 +79,8 @@ export interface TableView {
   deckCounts: { white: number; black: number }
   /** Names still to hand in, so the TV can nudge the right people. */
   waitingOn: string[]
+  /** Fewer players here than a game needs. The round is waiting, not over. */
+  shortHanded: boolean
 }
 
 export interface SelfView {
@@ -83,3 +98,4 @@ export type ServerMessage =
   | { type: 'self'; self: SelfView }
   | { type: 'error'; message: string }
   | { type: 'rejected'; reason: 'full' | 'nameTaken' }
+  | { type: 'pong' }

@@ -111,6 +111,7 @@ function TvTable({
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-ink">
       <TopRail table={table} music={music} onExit={onExit} />
+      {table.shortHanded && <ShortHanded table={table} />}
 
       <main className="relative min-h-0 flex-1">
         {/* The TV shows no visible heading — a heading would be furniture on
@@ -155,6 +156,24 @@ function headingFor(table: TableView): string {
     case 'gameOver':
       return `${winner} wins the game.`
   }
+}
+
+/**
+ * Someone's phone died. The round is still here and so are the scores; the
+ * table is just waiting. Saying so beats a screen that looks frozen.
+ */
+function ShortHanded({ table }: { table: TableView }) {
+  const here = table.players.filter((p) => p.connected).length
+  const away = table.players.filter((p) => !p.connected).map((p) => p.name)
+  return (
+    <p
+      role="status"
+      className="m-0 shrink-0 bg-paper px-[3vw] py-[1vh] text-center text-[min(1.4vw,1.15rem)] font-bold text-ink"
+    >
+      Waiting for {MIN_PLAYERS - here} more {MIN_PLAYERS - here === 1 ? 'player' : 'players'}.
+      {away.length > 0 && ` ${listNames(away)} dropped out. The game is held right here.`}
+    </p>
+  )
 }
 
 /* ── Rails ──────────────────────────────────────────────────── */

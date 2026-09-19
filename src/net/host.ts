@@ -5,6 +5,7 @@ import {
   chooseWinner,
   createGame,
   deckCounts,
+  isShortHanded,
   makeRoomCode,
   nextRound,
   pendingPlayers,
@@ -19,6 +20,7 @@ import {
 import { RANDO_ID, type DeckMode, type GameState } from '../game/types.ts'
 import { peerOptions } from './peer.ts'
 import {
+  PLAYER_TIMEOUT_MS,
   peerIdForRoom,
   type ClientMessage,
   type SelfView,
@@ -72,6 +74,7 @@ export function tableView(state: GameState): TableView {
     deck: state.options.deck,
     deckCounts: deckCounts(state.options.deck),
     waitingOn: pendingPlayers(state).map((p) => p.name),
+    shortHanded: isShortHanded(state),
   }
 }
 
@@ -100,10 +103,23 @@ export function createHost(
   let status: HostStatus = 'starting'
   let error: string | null = null
   let destroyed = false
-  /** The first player to sit down runs the table. */
+  /** The first player to sit down runs the table, for as long as they are here. */
   let hostPlayerId: string | null = null
 
   const connections = new Map<string, DataConnection>()
+  /** When each phone last said anything. A dead phone stops saying things. */
+  const lastSeen = new Map<string, number>()
+
+  /**
+   * Whoever is running the table right now. The job follows the first player
+   * to sit down, but it cannot stay with a phone that has gone: somebody
+   * present has to be able to start the next game.
+   */
+  function tableHost(): string | null {
+    const held = state.players.find((p) => p.id === hostPlayerId)
+    if (held?.connected) return held.id
+    return state.players.find((p) => p.connected)?.id ?? hostPlayerId
+  }
 
   const emit = () => onChange({ status, code, error, table: tableView(state) })
 
@@ -117,17 +133,22 @@ export function createHost(
     const table = tableView(state)
     for (const [playerId, connection] of connections) {
       if (!connection.open) continue
+      const host = tableHost()
       connection.send({ type: 'table', table } satisfies ServerMessage)
-      connection.send({ type: 'self', self: selfView(state, playerId, hostPlayerId) })
+      connection.send({ type: 'self', self: selfView(state, playerId, host) })
     }
     emit()
   }
 
   function handle(playerId: string, message: ClientMessage) {
-    const isTableHost = playerId === hostPlayerId
+    const isTableHost = playerId === tableHost()
     const isCzar = state.czarId === playerId
 
     switch (message.type) {
+      case 'ping':
+        // Answered so the phone knows the TV is still here too.
+        send(playerId, { type: 'pong' })
+        return
       case 'play': {
         const result = playCards(state, playerId, message.cards)
         if (!result.ok) send(playerId, { type: 'error', message: result.reason })
@@ -156,7 +177,7 @@ export function createHost(
         }
         break
       case 'kick':
-        if (isTableHost && message.playerId !== hostPlayerId) {
+        if (isTableHost && message.playerId !== playerId) {
           connections.get(message.playerId)?.close()
           connections.delete(message.playerId)
           removePlayer(state, message.playerId)
@@ -172,6 +193,7 @@ export function createHost(
     connection.on('data', (raw) => {
       const message = raw as ClientMessage
       if (!message || typeof message.type !== 'string') return
+      if (playerId) lastSeen.set(playerId, Date.now())
 
       if (message.type === 'hello') {
         if (message.playerId === RANDO_ID) return
@@ -182,6 +204,7 @@ export function createHost(
           return
         }
         playerId = message.playerId
+        lastSeen.set(playerId, Date.now())
         // A phone that reloads replaces its own stale connection.
         const stale = connections.get(playerId)
         if (stale && stale !== connection) stale.close()
@@ -191,7 +214,7 @@ export function createHost(
         }
         connection.send({
           type: 'welcome',
-          self: selfView(state, playerId, hostPlayerId),
+          self: selfView(state, playerId, tableHost()),
           table: tableView(state),
         } satisfies ServerMessage)
         broadcast()
@@ -205,7 +228,10 @@ export function createHost(
       if (!playerId) return
       // Only forget the seat if this is still the live connection for it;
       // a reconnect will have replaced it already.
-      if (connections.get(playerId) === connection) connections.delete(playerId)
+      if (connections.get(playerId) === connection) {
+        connections.delete(playerId)
+        lastSeen.delete(playerId)
+      }
       setConnected(state, playerId, false)
       broadcast()
     }
@@ -245,6 +271,27 @@ export function createHost(
     })
   }
 
+  /**
+   * A phone that is switched off, thrown in a bag or driven out of range
+   * never fires a close event: the data channel just goes quiet. Without
+   * this sweep the round would wait on it for the rest of the evening.
+   */
+  const sweep = setInterval(() => {
+    const cutoff = Date.now() - PLAYER_TIMEOUT_MS
+    let changed = false
+    for (const player of state.players) {
+      if (!player.connected) continue
+      const seen = lastSeen.get(player.id)
+      if (seen !== undefined && seen > cutoff) continue
+      connections.get(player.id)?.close()
+      connections.delete(player.id)
+      lastSeen.delete(player.id)
+      setConnected(state, player.id, false)
+      changed = true
+    }
+    if (changed) broadcast()
+  }, PLAYER_TIMEOUT_MS / 4)
+
   open()
   emit()
 
@@ -274,6 +321,7 @@ export function createHost(
     },
     destroy() {
       destroyed = true
+      clearInterval(sweep)
       for (const connection of connections.values()) connection.close()
       connections.clear()
       peer?.destroy()

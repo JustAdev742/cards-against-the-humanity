@@ -13,6 +13,7 @@ import {
   createGame,
   deckCounts,
   deckSize,
+  isShortHanded,
   makeRoomCode,
   nextRound,
   pendingPlayers,
@@ -249,10 +250,21 @@ test('if the Czar leaves, the round restarts under a new Czar', () => {
   assert.equal(state.submissions.length, 0)
 })
 
-test('dropping below three players sends the table back to the lobby', () => {
+test('removing players down to two keeps the game, short-handed', () => {
+  // Losing people should never cost anyone their score; the table waits.
   const state = tableOf(['Ann', 'Ben', 'Cal'])
   startGame(state)
   removePlayer(state, 'id-Cal')
+
+  assert.notEqual(state.phase, 'lobby')
+  assert.equal(isShortHanded(state), true)
+  assert.equal(state.players.length, 2)
+})
+
+test('a table with nobody left goes back to the lobby', () => {
+  const state = tableOf(['Ann', 'Ben', 'Cal'])
+  startGame(state)
+  for (const player of state.players.slice()) removePlayer(state, player.id)
 
   assert.equal(state.phase, 'lobby')
   assert.equal(state.czarId, null)

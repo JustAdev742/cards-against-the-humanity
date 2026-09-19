@@ -2,6 +2,8 @@ import Peer, { type DataConnection } from 'peerjs'
 
 import { CONNECTION_HELP, peerOptions } from './peer.ts'
 import {
+  HOST_TIMEOUT_MS,
+  PING_EVERY_MS,
   peerIdForRoom,
   type ClientMessage,
   type SelfView,
@@ -38,6 +40,17 @@ export function createClient(
   let destroyed = false
   let retries = 0
   let retryTimer: ReturnType<typeof setTimeout> | null = null
+  let heartbeat: ReturnType<typeof setInterval> | null = null
+  let watchdog: ReturnType<typeof setInterval> | null = null
+  let lastHeard = Date.now()
+
+  /** Stops talking to a connection we are about to give up on. */
+  function stopTimers() {
+    if (heartbeat) clearInterval(heartbeat)
+    if (watchdog) clearInterval(watchdog)
+    heartbeat = null
+    watchdog = null
+  }
 
   const snapshot: ClientSnapshot = {
     status: 'connecting',
@@ -50,6 +63,7 @@ export function createClient(
   const emit = () => onChange({ ...snapshot })
 
   function scheduleRetry(reason: string) {
+    stopTimers()
     if (destroyed || snapshot.status === 'rejected') return
     if (retries >= MAX_RETRIES) {
       snapshot.status = 'error'
@@ -77,15 +91,29 @@ export function createClient(
 
       connection.on('open', () => {
         retries = 0
+        lastHeard = Date.now()
         snapshot.status = 'connected'
         snapshot.notice = null
         emit()
         connection?.send({ type: 'hello', playerId, name } satisfies ClientMessage)
+
+        // Say hello periodically so the table knows this phone is still in the
+        // room, and watch for the table going quiet on us.
+        stopTimers()
+        heartbeat = setInterval(() => {
+          if (connection?.open) connection.send({ type: 'ping' } satisfies ClientMessage)
+        }, PING_EVERY_MS)
+        watchdog = setInterval(() => {
+          if (Date.now() - lastHeard > HOST_TIMEOUT_MS) scheduleRetry('Lost the table.')
+        }, PING_EVERY_MS)
       })
 
       connection.on('data', (raw) => {
         const message = raw as ServerMessage
+        lastHeard = Date.now()
         switch (message.type) {
+          case 'pong':
+            return
           case 'welcome':
             snapshot.self = message.self
             snapshot.table = message.table
@@ -138,6 +166,7 @@ export function createClient(
     },
     destroy() {
       destroyed = true
+      stopTimers()
       if (retryTimer) clearTimeout(retryTimer)
       connection?.close()
       peer?.destroy()

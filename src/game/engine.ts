@@ -143,8 +143,10 @@ export function addPlayer(state: GameState, id: string, rawName: string): JoinRe
   const existing = state.players.find((p) => p.id === id)
   if (existing) {
     // A reconnecting phone keeps its seat, its hand and its score.
+    const wasAway = !existing.connected
     existing.connected = true
     if (name) existing.name = name
+    if (wasAway) ensurePlayable(state, state.players.indexOf(existing))
     return { ok: true, player: existing }
   }
   if (state.players.length >= MAX_PLAYERS) return { ok: false, reason: 'full' }
@@ -163,10 +165,45 @@ export function addPlayer(state: GameState, id: string, rawName: string): JoinRe
   return { ok: true, player }
 }
 
+/** The seat after `from`, skipping anyone whose phone is not with us. */
+function nextConnectedFrom(state: GameState, from: number): number {
+  const count = state.players.length
+  for (let step = 0; step < count; step++) {
+    const index = (from + step) % count
+    if (state.players[index].connected) return index
+  }
+  return -1
+}
+
+/**
+ * Makes sure the table can actually move, after anyone arrives or leaves.
+ *
+ * A game is never thrown away because a phone locked: scores and seats stay
+ * exactly where they are. The only thing a departure can force is a new round,
+ * and only when the Czar was the one who went, because nobody else can judge
+ * the cards already on the table.
+ */
+function ensurePlayable(state: GameState, from: number): GameState {
+  if (state.phase === 'lobby' || state.phase === 'gameOver') return state
+
+  const czar = state.players.find((p) => p.id === state.czarId)
+  if (!czar?.connected) return startRound(state, from)
+  return maybeCloseWriting(state)
+}
+
+/** Fewer players here than a game needs. The round waits rather than dying. */
+export function isShortHanded(state: GameState): boolean {
+  if (state.phase === 'lobby' || state.phase === 'gameOver') return false
+  return state.players.filter((p) => p.connected).length < MIN_PLAYERS
+}
+
 export function setConnected(state: GameState, id: string, connected: boolean): GameState {
-  const player = state.players.find((p) => p.id === id)
-  if (player) player.connected = connected
-  return connected ? state : maybeCloseWriting(state)
+  const index = state.players.findIndex((p) => p.id === id)
+  if (index === -1) return state
+  const player = state.players[index]
+  if (player.connected === connected) return state
+  player.connected = connected
+  return ensurePlayable(state, connected ? index : index + 1)
 }
 
 /** Drops a player for good and keeps the round playable without them. */
@@ -175,19 +212,18 @@ export function removePlayer(state: GameState, id: string): GameState {
   if (index === -1) return state
   const [gone] = state.players.splice(index, 1)
   state.whiteDiscard.push(...gone.hand)
+  for (const submission of state.submissions.filter((s) => s.playerId === id)) {
+    state.whiteDiscard.push(...submission.cards)
+  }
   state.submissions = state.submissions.filter((s) => s.playerId !== id)
   state.revealOrder = state.revealOrder.filter((pid) => pid !== id)
   if (state.revealed > state.revealOrder.length) state.revealed = state.revealOrder.length
-
-  if (state.phase === 'lobby') return state
-  if (state.players.length < MIN_PLAYERS) {
+  if (state.players.length === 0) {
     state.phase = 'lobby'
     state.czarId = null
     return state
   }
-  // If the Czar walks out the round is void and the next player judges.
-  if (state.czarId === id) return startRound(state, index % state.players.length)
-  return maybeCloseWriting(state)
+  return ensurePlayable(state, index % state.players.length)
 }
 
 /** Swaps the deck out. Only meaningful in the lobby, before anyone holds cards. */
@@ -208,21 +244,33 @@ export function canStart(state: GameState): boolean {
 }
 
 export function startGame(state: GameState): GameState {
+  // Only ever from the lobby. The TV and the first player's phone both carry a
+  // start button, and two taps must not reshuffle a game already in progress.
+  if (state.phase !== 'lobby') return state
   if (!canStart(state)) return state
   for (const player of state.players) {
     player.score = 0
     state.whiteDiscard.push(...player.hand)
     player.hand = drawWhite(state, state.options.handSize)
   }
+  state.round = 0
   return startRound(state, 0)
 }
 
 function startRound(state: GameState, czarIndex: number): GameState {
+  // With nobody here there is nobody to judge. Leave the table exactly as it
+  // is and let it pick up when someone comes back.
+  const czarSeat = nextConnectedFrom(state, czarIndex)
+  if (czarSeat === -1) return state
+
+  // Whatever was on the table goes back to the piles, including a round that
+  // was voided part way through, so those cards keep circulating.
   if (state.black) state.blackDiscard.push(state.black)
+  for (const submission of state.submissions) state.whiteDiscard.push(...submission.cards)
 
   state.round += 1
   state.phase = 'writing'
-  state.czarId = state.players[czarIndex % state.players.length]?.id ?? null
+  state.czarId = state.players[czarSeat].id
   state.black = drawBlack(state)
   state.submissions = []
   state.revealOrder = []
@@ -241,8 +289,13 @@ function startRound(state: GameState, czarIndex: number): GameState {
   return state
 }
 
-/** Everyone who is connected, is not the Czar, and still owes a play. */
+/**
+ * Everyone the round is still waiting on. Only a question while people are
+ * answering: once the cards are in, nobody owes anything, including a phone
+ * that reconnects after the round has moved on.
+ */
 export function pendingPlayers(state: GameState): Player[] {
+  if (state.phase !== 'writing') return []
   return state.players.filter(
     (p) =>
       p.connected && p.id !== state.czarId && !state.submissions.some((s) => s.playerId === p.id),
@@ -320,8 +373,6 @@ export function chooseWinner(state: GameState, playerId: string): GameState {
 export function nextRound(state: GameState): GameState {
   if (state.phase !== 'roundEnd') return state
 
-  for (const submission of state.submissions) state.whiteDiscard.push(...submission.cards)
-
   const best = state.players.reduce((top, p) => Math.max(top, p.score), 0)
   if (best >= state.options.targetScore) {
     state.phase = 'gameOver'
@@ -329,10 +380,12 @@ export function nextRound(state: GameState): GameState {
   }
 
   const czarIndex = state.players.findIndex((p) => p.id === state.czarId)
-  return startRound(state, (czarIndex + 1) % state.players.length)
+  return startRound(state, czarIndex + 1)
 }
 
 export function playAgain(state: GameState): GameState {
+  // Offered when a game ends. Anywhere else it would wipe a live scoreboard.
+  if (state.phase !== 'gameOver') return state
   for (const player of state.players) {
     state.whiteDiscard.push(...player.hand)
     player.hand = []
