@@ -43,7 +43,7 @@ async function transact<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore
     const db = await open()
     return await new Promise<T | null>((resolve) => {
       const request = run(db.transaction(STORE, mode).objectStore(STORE))
-      request.onsuccess = () => resolve(request.result as T)
+      request.onsuccess = () => resolve((request.result as T | undefined) ?? null)
       request.onerror = () => resolve(null)
     })
   } catch {
@@ -90,7 +90,7 @@ export async function requestRememberedTrack(): Promise<File | null> {
 }
 
 export async function hasRememberedTrack(): Promise<boolean> {
-  return (await storedHandle()) !== null
+  return (await storedHandle()) != null
 }
 
 /** Opens the system picker and remembers whatever is chosen. */
