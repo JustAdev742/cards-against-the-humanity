@@ -173,7 +173,12 @@ function Lobby({ table, host }: { table: TableView; host: ReturnType<typeof useH
         >
           <span translate="no">{table.code}</span>
         </p>
-        <p className="m-0 mt-[2.5vh] max-w-[22ch] text-[min(2vw,1.9rem)] font-bold leading-tight text-ash-bright">
+        {/* The address people type. A project path can be long, so it steps
+            down to stay on one line rather than breaking mid-word. */}
+        <p
+          className="m-0 mt-[2.5vh] font-bold leading-tight text-ash-bright"
+          style={{ fontSize: `min(${Math.min(2, 46 / joinHost().length)}vw, 1.9rem)` }}
+        >
           {joinHost()}
         </p>
       </section>
