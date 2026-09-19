@@ -98,34 +98,38 @@ person turns up.
 There is no table of pre-scored card combinations anywhere in this project, and
 deliberately so: a lookup table only knows the pairs somebody sat down and
 scored, and would have nothing to say about a card it had not seen. A bot works
-out the answer from the sentence in front of it.
+the answer out from the sentence in front of it.
 
-**What is the hole asking for?** This is the part that matters most. A card is
-sorted into what sort of thing it is — a person, a place, an object, something
-you do, something that happens, or an abstraction — and the setup is read for
-what it is reaching for. "What's that sound?" wants something that makes a
-noise, so the Pope is out and a fart is in. "Because of ___" wants a cause.
-"Ask me anything" wants somebody. "Betcha can't have just one" wants something
-you could eat.
+**First, is it even an answer?** A card is sorted into what sort of thing it is
+— a person, a place, an object, something you do, something that happens, or an
+abstraction — and the setup is read for what it is reaching for. "What's that
+sound?" wants something that makes a noise, so the Pope is out and a fart is in.
+"Because of ___" wants a cause. "Ask me anything" wants somebody.
 
 Those frames are ordinary English rather than notes about particular cards —
 "because of X" wants a cause whichever card it turns up in — and a test refuses
 any frame that only matches one card in the printed decks, so this cannot
 quietly rot into a lookup table.
 
-The rest of what a bot weighs:
+**That part is a floor, not the joke.** It is scored as a gate: once a card is
+plausibly an answer, being *more* on-topic earns nothing further. This matters
+more than it sounds. Left as a straight score it makes the blandest card that
+fits win every round, which is how you end up playing "Betcha can't have just
+one! — Boneless buffalo wings." — exactly the right sort of thing, and not a
+joke at all. Past the gate, what decides it is:
 
-- **Register clash.** A prim setup with an indecent answer. The stiffer the
-  frame, the harder the card lands, which is the trick the printed deck runs on.
-- **Contrast.** Each card gets a vector over thirteen little worlds — school,
-  money, the body, the supernatural — and the distance between the setup's
-  world and the answer's is most of the rest of the joke.
-- **Can you picture it.** A named thing beats a category, and both beat an
-  abstraction. "Shame." is almost never the funny card.
-- **Grammar.** "I was bitten by a ___" plus "A bear." reads "a a bear". Blanks
-  that follow *a* or *the* are found by reading the setup, so this works on
-  cards nobody has written yet.
-- **Echo.** An answer that borrows the setup's own words back reads flat.
+- **Register clash.** A prim setup with an indecent answer. Rude is not only
+  bodily: a crucifixion in a snack advert does the same work as a fart in one,
+  and an advertising voice counts as prim because a voice putting on a smile is
+  a voice worth ruining.
+- **How much of a picture it paints.** Detail is an asset, not a cost. "An
+  octopus giving seven handjobs and smoking a cigarette" wins rounds that "A
+  mistake." never will.
+- **How far the card travels inside itself.** An answer that collides two
+  different worlds is doing something; one that names a single concept is not.
+- **Contrast** with the setup's own world, across thirteen little domains.
+- **Grammar**, so "I was bitten by a ___" does not end up reading "a a bear",
+  and **echo**, because borrowing the setup's own words back reads flat.
 
 Six personalities weigh those differently, which is the point — a table where
 every bot plays the same card is not a game. Bex goes for the rudest thing in
@@ -133,7 +137,7 @@ her hand; Wendell answers a lurid question with something painfully ordinary;
 Nadia wants the strangest and most specific card; Ozzy wants a name or a number;
 Hutch plays whatever reads best in the sentence; Pip is chaotic and loses more
 than the others. Dealt the same hand, the six of them find about three different
-cards between them, and all six agree less than 3% of the time.
+cards between them, and all six agree on 4% of rounds.
 
 For a Pick 2 the holes are filled together rather than one at a time, because
 two answers out of the same world read as one flat idea.
@@ -141,18 +145,24 @@ two answers out of the same world read as one flat idea.
 ### Is any of that actually working?
 
 A bot beating a random player is not evidence when the judge is another bot
-running the same scorer — they agree by construction. So there is a held-out
-benchmark of twenty pairings instead: a real setup, the card a person would
-obviously pick, and real cards from the same deck that obviously do not work.
-Nothing in the model is allowed to know about them, and a test proves it by
-rewording the setups and checking the answer does not move.
+running the same scorer — they agree by construction. So there are two held-out
+benchmarks of real cards instead, and the model is not allowed to know about
+either: a test rewords the setups and checks the answer does not move.
 
-The first version of this scored **8 out of 20** — it would answer "What's that
-sound?" with "Former President George W. Bush." The current one scores **20**.
+**Is it answering the question?** Twenty pairings where a person's pick is not in
+doubt, against cards from the same deck that plainly do not work. The first
+version of this scored 8 out of 20 — it would answer "What's that sound?" with
+"Former President George W. Bush." It now scores 20.
 
-The other measurements, for what they are worth: against six bots and one seat
-that just plays off the top of its hand, the random seat wins 2.4% of rounds
-where an even split would be 14.3%.
+**Is it actually funny?** Sixteen pairings where *both* cards are already the
+right sort of thing for the hole, and the only difference is that one of them is
+a joke. Passing the first benchmark alone only makes a bot literal-minded, and a
+literal-minded player is the worst one at the table. It scored 9 of 16 on the day
+that benchmark was written. It now scores 16.
+
+The other measurement, for what it is worth: against six bots and one seat that
+just plays off the top of its hand, the random seat wins 2.4% of rounds where an
+even split would be 14.3%.
 
 ### They work out who they are playing with
 
@@ -165,10 +175,13 @@ even the ones who do not personally find it funny.
 The nudge is bounded, so a bot never entirely stops being itself, and it is
 forgotten when the table closes. Nothing is sent anywhere.
 
-Over three thousand simulated rounds, a bot that watches the judge beats an
-identical twin that does not by 51–75%, depending on the judge — and falls back
-to about 50% against Pip, who is genuinely unpredictable. That is the result you
-want: there is nothing to learn from a judge who is picking at random.
+At a five-seat table over 2,500 rounds, a bot that watches the judge beats an
+identical twin that does not — but how much depends on who is watching. It is
+worth a lot to Wendell (58–73%) and Hutch (48–68%), something to Bex and Ozzy
+(50–60%), and nothing at all to Nadia and Pip (46–52%). That last part is not a
+bug being glossed over: those two are the absurdist and the chaotic one, their
+picks are driven by high-variance signals on purpose, and there is not much for
+evidence to move.
 
 Bots answer on a delay and pause entirely if every human has left, so a table
 nobody is sitting at does not quietly finish the game without you.

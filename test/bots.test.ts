@@ -11,6 +11,7 @@ import {
   chooseCards,
   judge,
   learnFrom,
+  LEARNING_LIMIT,
   personalityFor,
   scoreWith,
   signalsFor,
@@ -208,7 +209,10 @@ test('learning stays inside its bounds however lopsided the evidence', () => {
     model = learnFrom(model, card, ['Fiery poops.'], [['Hope.']])
   }
   for (const [key, value] of Object.entries(model)) {
-    assert.ok(Math.abs(value as number) <= 1.2001, `${key} ran away to ${value}`)
+    assert.ok(
+      Math.abs(value as number) <= LEARNING_LIMIT + 0.0001,
+      `${key} ran away to ${value}, past the ceiling of ${LEARNING_LIMIT}`,
+    )
   }
 })
 

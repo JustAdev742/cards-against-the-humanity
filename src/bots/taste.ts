@@ -18,22 +18,22 @@ import { asksASense, kindFit, senseFit } from './kinds.ts'
 export interface Taste {
   /** Does the answer fit the hole grammatically. */
   fit: number
-  /** Is it even the kind of thing the question asked for. */
+  /** Is it even the kind of thing the question asked for. A floor, not a
+   *  target: see the gate in signalsFor for why that distinction matters. */
   kind: number
   /** A prim setup with an indecent answer. The other engine of the joke. */
   clash: number
-  /** Can you picture it. A named thing beats a concept nearly every time. */
-  image: number
+  /** How much of a picture it paints. Detail is an asset, not a cost. */
+  vivid: number
+  /** How far the answer travels inside itself. An octopus smoking a cigarette
+   *  is two ideas colliding; "A mistake." is none. */
+  twist: number
   /** How far the answer is from the setup's world. The engine of the joke. */
   contrast: number
   /** Bodily, childish. The whole register of the Family Edition. */
   gross: number
   /** Transgressive. Only the adult deck has much of it. */
   crude: number
-  /** Things you can point at beat things you cannot. */
-  concrete: number
-  /** Short answers land harder. */
-  punch: number
   /** Abstractions. Usually a negative weight. */
   abstract: number
   /** Repeating the setup's own words back at it. Usually a negative weight. */
@@ -52,15 +52,14 @@ export interface Personality {
 
 const BASE: Taste = {
   fit: 1.1,
-  kind: 2.4,
-  clash: 0.9,
-  image: 1.3,
+  kind: 1.5,
+  clash: 1.8,
+  vivid: 1.9,
+  twist: 1.2,
   contrast: 0.7,
   gross: 0.4,
-  crude: 0.35,
-  concrete: 0.3,
-  punch: 0.12,
-  abstract: -1.1,
+  crude: 0.4,
+  abstract: -1.3,
   echo: -0.8,
   chaos: 0.3,
 }
@@ -79,45 +78,42 @@ export const PERSONALITIES: Personality[] = [
     kind: 'bex',
     name: 'Bex',
     blurb: 'Goes straight for the rudest thing in her hand.',
-    taste: mix({ crude: 1.2, gross: 1, clash: 2.2, contrast: 0.5, abstract: -1.2, chaos: 0.3 }),
+    taste: mix({ crude: 1.4, gross: 1.1, clash: 2.4, vivid: 1.5, contrast: 0.5, chaos: 0.3 }),
   },
   {
     kind: 'wendell',
     name: 'Wendell',
     blurb: 'Deadpan. Answers a lurid question with something painfully ordinary.',
     taste: mix({
-      kind: 2.8, contrast: 1.4, clash: 0.1, crude: -0.5, gross: -0.2,
-      punch: 0.45, image: 1.1, chaos: 0.2,
+      kind: 2.2, contrast: 1.5, clash: 0.2, crude: -0.4, gross: -0.2,
+      vivid: 1.2, twist: 0.5, chaos: 0.2,
     }),
   },
   {
     kind: 'nadia',
     name: 'Nadia',
     blurb: 'Absurdist. The stranger and more specific, the better.',
-    taste: mix({
-      kind: 1.7, contrast: 1.5, image: 1.9, punch: -0.25, abstract: -1.4, chaos: 0.5,
-    }),
+    taste: mix({ vivid: 2.8, twist: 2.4, contrast: 1.4, kind: 1.1, abstract: -1.6, chaos: 0.5 }),
   },
   {
     kind: 'ozzy',
     name: 'Ozzy',
     blurb: 'Likes a name, a number, a brand. Something you can picture.',
-    taste: mix({ image: 2.1, concrete: 1.2, contrast: 0.6, punch: 0.3, abstract: -1.5, chaos: 0.25 }),
+    taste: mix({ vivid: 2.9, twist: 1, contrast: 0.6, abstract: -1.7, chaos: 0.25 }),
   },
   {
     kind: 'hutch',
     name: 'Hutch',
     blurb: 'Plays it straight. Whatever reads best in the sentence.',
-    taste: mix({ fit: 2.4, kind: 3.2, contrast: 0.35, clash: 0.4, echo: -1, chaos: 0.15 }),
+    taste: mix({ fit: 2.4, kind: 2.4, vivid: 1.4, contrast: 0.35, echo: -1, chaos: 0.15 }),
   },
   {
     kind: 'pip',
     name: 'Pip',
     blurb: 'Chaotic. Often wrong, occasionally perfect.',
-    taste: mix({ kind: 1.4, contrast: 1, gross: 0.8, clash: 1.2, chaos: 1.1 }),
+    taste: mix({ kind: 1, twist: 1.8, gross: 0.9, clash: 1.3, vivid: 1.6, chaos: 1.1 }),
   },
 ]
-
 
 export const personalityFor = (kind: string): Personality =>
   PERSONALITIES.find((p) => p.kind === kind) ?? PERSONALITIES[0]
@@ -129,12 +125,11 @@ export interface Signals {
   fit: number
   kind: number
   clash: number
-  image: number
+  vivid: number
+  twist: number
   contrast: number
   gross: number
   crude: number
-  concrete: number
-  punch: number
   abstract: number
   echo: number
 }
@@ -157,22 +152,33 @@ export function signalsFor(setup: SetupFeatures, answer: CardFeatures, slot: num
   if (asksASense(setup.expect)) {
     kind = Math.max(kind * 0.55, senseFit(setup.expect, answer.text))
   }
+  // Answering the question is a floor to clear, not a prize to maximise. Left
+  // as a straight score it makes the blandest card that fits win every round —
+  // "Betcha can't have just one! — Boneless buffalo wings." is the right sort
+  // of thing and no joke at all. So it saturates: past the gate, being even
+  // more on-topic earns nothing, and the funny signals decide.
+  const clears = clamp01((kind - 0.15) / 0.35)
 
   // A prim setup and an indecent answer. The stiffer the frame, the harder
   // the card lands — which is the whole trick the printed deck runs on.
-  const prim = clamp01(setup.formal * 0.45 + setup.wholesome * 0.35)
-  const rude = clamp01((answer.crude * 0.6 + answer.gross * 0.5) / 1.5)
+  // An advert is a voice putting on a smile, which makes it every bit as
+  // ruinable as a school assembly — so a promotional frame counts as prim.
+  const prim = clamp01(
+    setup.formal * 0.45 + setup.wholesome * 0.35 + (setup.expect.promotional ? 0.55 : 0),
+  )
+  // Rude is not only bodily. A crucifixion in a snack advert does the same
+  // work as a fart in one, and the deck uses both.
+  const rude = clamp01((answer.crude * 0.6 + answer.gross * 0.5 + answer.taboo * 0.8) / 1.2)
 
   return {
     fit: clamp01(fit),
-    kind,
+    kind: clears,
     clash: prim * rude,
-    image: answer.image,
+    vivid: answer.image,
+    twist: clamp01((answer.domainsTouched - 1) / 2),
     contrast: domainDistance(setup, answer),
     gross: clamp01(answer.gross / 2),
     crude: clamp01(answer.crude / 2),
-    concrete: clamp01(answer.concrete / 2),
-    punch: clamp01(1 - answer.length / 110),
     abstract: clamp01(answer.kinds.quality / 1.5),
     echo: echo(setup, answer),
   }
@@ -183,12 +189,11 @@ export function scoreWith(signals: Signals, taste: Taste): number {
     signals.fit * taste.fit +
     signals.kind * taste.kind +
     signals.clash * taste.clash +
-    signals.image * taste.image +
+    signals.vivid * taste.vivid +
+    signals.twist * taste.twist +
     signals.contrast * taste.contrast +
     signals.gross * taste.gross +
     signals.crude * taste.crude +
-    signals.concrete * taste.concrete +
-    signals.punch * taste.punch +
     signals.abstract * taste.abstract +
     signals.echo * taste.echo
   )
@@ -197,7 +202,7 @@ export function scoreWith(signals: Signals, taste: Taste): number {
 /* ── Learning who likes what ────────────────────────────────── */
 
 const LEARNED_KEYS = [
-  'kind', 'clash', 'image', 'contrast', 'gross', 'crude', 'concrete', 'punch', 'abstract', 'echo',
+  'kind', 'clash', 'vivid', 'twist', 'contrast', 'gross', 'crude', 'abstract', 'echo',
 ] as const
 type LearnedKey = (typeof LEARNED_KEYS)[number]
 
@@ -208,8 +213,13 @@ type LearnedKey = (typeof LEARNED_KEYS)[number]
  */
 export type JudgeModel = Partial<Record<LearnedKey, number>>
 
-const LEARNING_RATE = 0.5
-const LIMIT = 1.2
+const LEARNING_RATE = 0.55
+/**
+ * How far watching a judge can bend a bot's taste. It has to stay in
+ * proportion to the weights in BASE — set too low next to a heavily weighted
+ * signal, a bot's own preferences drown out everything it has learned.
+ */
+export const LEARNING_LIMIT = 1.9
 
 /**
  * Folds one result into what we think a judge likes. The winning card is
@@ -239,18 +249,25 @@ export function learnFrom(
     const lost = lostMeans.reduce((sum, m) => sum + m(key), 0) / lostMeans.length
     const gap = won(key) - lost
     const current = next[key] ?? 0
-    next[key] = Math.max(-LIMIT, Math.min(LIMIT, current + LEARNING_RATE * gap))
+    next[key] = Math.max(-LEARNING_LIMIT, Math.min(LEARNING_LIMIT, current + LEARNING_RATE * gap))
   }
   return next
 }
 
-/** A taste bent towards what one particular judge has been rewarding. */
+/**
+ * A taste bent towards what one particular judge has been rewarding.
+ *
+ * A flat offset, deliberately: scaling the nudge by how much the bot already
+ * cares about that dimension was measured against this and made no difference
+ * worth the extra moving part.
+ */
 export function tasteForJudge(taste: Taste, model: JudgeModel | undefined): Taste {
   if (!model) return taste
   const bent = { ...taste }
   for (const key of LEARNED_KEYS) {
     const learned = model[key]
-    if (learned !== undefined) bent[key] = bent[key] + learned
+    if (learned === undefined) continue
+    bent[key] = bent[key] + learned
   }
   return bent
 }

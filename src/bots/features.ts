@@ -5,6 +5,7 @@ import {
   DOMAINS,
   DOMAIN_WORDS,
   FORMAL_WORDS,
+  TABOO_WORDS,
   WHOLESOME_WORDS,
   GROSS_WORDS,
   contentWords,
@@ -15,6 +16,7 @@ import {
   expectationOf,
   kindsOf,
   leadsWithGerund,
+  vividnessOf,
   type Expectation,
   type KindVector,
 } from './kinds.ts'
@@ -32,13 +34,18 @@ export interface CardFeatures {
   formal: number
   /** Being nice in front of children. What a rude card ruins. */
   wholesome: number
+  /** Shocking without being bodily: death, harm, the sacred. */
+  taboo: number
   abstract: number
   /** Proper nouns and numbers: things you can point at. */
   concrete: number
   /** What sort of thing this is — a person, a place, a thing, a doing. */
   kinds: KindVector
-  /** How easily you could picture it. Abstractions score near zero. */
+  /** How much of a picture it paints. Abstractions score near zero. */
   image: number
+  /** How many of the thirteen worlds this card touches on its own. A card
+   *  that spans two of them is doing something; one that spans none is not. */
+  domainsTouched: number
   /** Characters. Short answers land harder after a long setup. */
   length: number
   /** "Eating pasta out of my pants." — an action rather than a thing. */
@@ -81,16 +88,6 @@ function concreteness(text: string): number {
   return proper
 }
 
-/**
- * How much of a picture the card puts in your head. A named thing, a place or
- * an object all count; an abstraction counts against, because "Shame." is not
- * an image and almost never the funny answer.
- */
-function imageOf(kinds: KindVector): number {
-  const solid = kinds.object + kinds.person + kinds.place + kinds.event * 0.6 + kinds.activity * 0.5
-  return Math.max(0, Math.min(1, solid / 2 - kinds.quality * 0.45))
-}
-
 function baseFeatures(text: string): CardFeatures {
   const words = contentWords(text)
   const kinds = kindsOf(text)
@@ -113,10 +110,12 @@ function baseFeatures(text: string): CardFeatures {
     crude: lexicalHits(text, CRUDE_WORDS),
     formal: lexicalHits(text, FORMAL_WORDS),
     wholesome: lexicalHits(text, WHOLESOME_WORDS),
+    taboo: lexicalHits(text, TABOO_WORDS),
     abstract: lexicalHits(text, ABSTRACT_WORDS),
     concrete: concreteness(text),
     kinds,
-    image: imageOf(kinds),
+    image: vividnessOf(text, kinds),
+    domainsTouched: raw.filter((v) => v > 0).length,
     length: text.length,
     gerund: leadsWithGerund(text), // was /^[a-z]+ing\b/.test(lead),
     article: lead.startsWith('the ') ? 'the' : /^an? /.test(lead) ? 'a' : null,

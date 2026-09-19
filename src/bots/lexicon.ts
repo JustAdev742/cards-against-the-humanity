@@ -107,9 +107,23 @@ export const GROSS_WORDS = [
 
 /** The transgressive end of the adult deck. */
 export const CRUDE_WORDS = [
-  'sex', 'penis', 'vagina', 'dick', 'cock', 'cum', 'jizz', 'orgasm', 'porn', 'nipple',
+  'sex', 'sperm', 'penis', 'vagina', 'dick', 'cock', 'cum', 'jizz', 'orgasm', 'porn', 'nipple',
   'boob', 'tit', 'anal', 'asshole', 'naked', 'nude', 'erection', 'masturbat', 'genital',
   'horny', 'slut', 'whore', 'fuck', 'shit', 'bitch', 'piss', 'bastard', 'crotch',
+]
+
+/**
+ * Shocking without being bodily or sexual: death, harm, disease, the sacred.
+ * A cheerful frame is ruined by these just as thoroughly as by a rude word,
+ * and the adult deck leans on them at least as hard.
+ */
+export const TABOO_WORDS = [
+  'death', 'dead', 'dying', 'die ', 'kill', 'murder', 'corpse', 'funeral', 'suicide',
+  'crucifix', 'abortion', 'miscarriage', 'cancer', 'tumor', 'tumour', 'disease', 'plague',
+  'genocide', 'slavery', 'slave', 'racism', 'racist', 'nazi', 'holocaust', 'war crime',
+  'shooting', 'stabbing', 'torture', 'kidnap', 'hostage', 'overdose', 'addiction',
+  'jesus', 'christ', 'god', 'holy', 'church', 'blood of', 'communion', 'the pope',
+  'orphan', 'famine', 'starving', 'homeless', 'prison', 'execution', 'hanging',
 ]
 
 /** The voice of an institution. The stiffer the setup, the harder a card lands. */
@@ -158,10 +172,29 @@ export function contentWords(text: string): string[] {
     .filter((w) => w.length > 2 && !STOP.has(w))
 }
 
-/** How many of a word list a text touches, as a share of its length. */
+/**
+ * Endings a stem is allowed to pick up and still be the same word. Without
+ * this, a plain substring match reads "bone" inside "Boneless", which scored
+ * boneless buffalo wings as twice the picture it is.
+ */
+const INFLECTIONS = new Set([
+  '', 's', 'es', 'ed', 'd', 'ing', 'er', 'ers', 'ion', 'ions', 'ive', 'ies', 'y', 'm', 't', 'ts',
+])
+
+/** How many of a word list a text touches. */
 export function lexicalHits(text: string, words: readonly string[]): number {
   const lower = text.toLowerCase()
+  const tokens = lower.split(/[^a-z0-9'’-]+/).filter(Boolean)
   let hits = 0
-  for (const word of words) if (lower.includes(word)) hits++
+  for (const entry of words) {
+    const stem = entry.trim()
+    if (!stem) continue
+    // Multi-word entries ("heart attack", "the pope") have their own boundaries.
+    if (stem.includes(' ')) {
+      if (lower.includes(stem)) hits++
+      continue
+    }
+    if (tokens.some((t) => t.startsWith(stem) && INFLECTIONS.has(t.slice(stem.length)))) hits++
+  }
   return hits
 }

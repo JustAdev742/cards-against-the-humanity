@@ -11,6 +11,8 @@
  * a test checks, so this cannot quietly become a lookup table.
  */
 
+import { lexicalHits } from './lexicon.ts'
+
 export const KINDS = ['person', 'place', 'object', 'activity', 'event', 'quality'] as const
 export type Kind = (typeof KINDS)[number]
 
@@ -39,6 +41,7 @@ const PERSON_WORDS = [
   'boss', 'neighbor', 'neighbour', 'stranger', 'boyfriend', 'girlfriend', 'wife', 'husband',
   'celebrity', 'hamburglar', 'batman', 'superman', 'spider-man', 'narc', 'bully', 'twin',
   'hero', 'villain', 'ghost', 'vampire', 'zombie', 'alien', 'caveperson', 'cavemen', 'caveman',
+  'audience', 'crowd', 'mob ', 'choir', 'band', 'team', 'gang', 'army', 'class of', 'everyone',
 ]
 
 /** Somewhere you could stand. */
@@ -65,6 +68,8 @@ const OBJECT_WORDS = [
   'banana', 'broccoli', 'corn', 'soup', 'nacho', 'wine', 'beer', 'milk', 'candy', 'cake',
   'bat', 'spider', 'seagull', 'goose', 'geese', 'bird', 'dog', 'cat', 'horse', 'monkey',
   'gorilla', 'bear', 'shark', 'rat ', 'mouse', 'snake', 'tarantula', 'cow ', 'pig ', 'fish',
+  'whale', 'octopus', 'squid', 'dolphin', 'crab', 'owl', 'moose', 'llama', 'sloth', 'otter',
+  'hog ', 'goat', 'lizard', 'frog', 'beetle', 'wasp', 'hornet', 'swarm', 'giant', 'dragon',
 ]
 
 /** Something that happens to you rather than something you do. */
@@ -96,11 +101,9 @@ const NOT_GERUNDS = new Set([
   'sibling', 'darling', 'painting', 'meaning', 'viking', 'bling', 'swing', 'thing',
 ])
 
-const hits = (lower: string, words: readonly string[]): number => {
-  let n = 0
-  for (const w of words) if (lower.includes(w)) n++
-  return n
-}
+// One matcher for every word list in the model, so a stem cannot mean one
+// thing here and another thing in lexicon.ts.
+const hits = (lower: string, words: readonly string[]): number => lexicalHits(lower, words)
 
 /** A card that opens with a real verb-ing: "Laying an egg", "Doing crimes". */
 export function leadsWithGerund(text: string): boolean {
@@ -133,7 +136,11 @@ export function kindsOf(text: string): KindVector {
   k.object += hits(lower, OBJECT_WORDS) * 0.8
   k.event += hits(lower, EVENT_WORDS) * 1.1
   k.quality += hits(lower, QUALITY_WORDS) * 1.2
-  if (ABSTRACT_SUFFIX.test(text)) k.quality += 0.7
+  // The suffix is a last resort, not a verdict. "A live studio audience."
+  // ends in -ence and is a room full of people, so it only counts when
+  // nothing concrete was found at all.
+  const solid = k.person + k.object + k.place
+  if (solid === 0 && ABSTRACT_SUFFIX.test(text)) k.quality += 0.7
 
   // A name is a thing in the world; whether it is a person or an object, it
   // beats an abstraction, so it counts towards both rather than neither.
@@ -155,6 +162,33 @@ export function kindsOf(text: string): KindVector {
   const total = KINDS.reduce((sum, key) => sum + k[key], 0)
   if (total === 0) k.object = 0.6
   return k
+}
+
+/**
+ * How much of a picture the card paints.
+ *
+ * Counted rather than averaged, and rewarding elaboration instead of
+ * punishing it. This is the difference between the two cards that both
+ * answer the question: "An octopus giving seven handjobs and smoking a
+ * cigarette" wins rounds that "A mistake." never will.
+ */
+export function vividnessOf(text: string, kinds: KindVector): number {
+  const named = namedThings(text)
+  const counted = /\d|\b(seven|three|many|hundred|thousand|million)\b/i.test(text) ? 1 : 0
+  const words = text.split(/\s+/).filter(Boolean).length
+  // Detail saturates, so a rambling card is not automatically the best one.
+  const detail = Math.min(1, Math.max(0, words - 3) / 8)
+  // Anything that happens, or that you could point at, is a picture. Reading
+  // this off the kind vector rather than re-counting word lists is what stops
+  // "A crucifixion." scoring as no image at all: it is an event, and events
+  // are the most vivid things in the deck.
+  const solid =
+    kinds.object + kinds.person + kinds.place + kinds.event * 0.8 + kinds.activity * 0.35
+  // Start from "this is a thing in the world" and take away for abstraction,
+  // rather than building up out of a word list that can never cover every
+  // concrete noun in five hundred cards.
+  const raw = 0.5 + Math.min(0.5, solid * 0.22) + named * 0.2 + counted * 0.2 + detail * 0.5
+  return Math.max(0, Math.min(1.4, raw) - kinds.quality * 0.6)
 }
 
 /* ── What the hole is asking for ────────────────────────────── */
@@ -196,7 +230,7 @@ const FRAMES: Frame[] = [
   { name: 'how-did', test: /\bhow (did|do|does|i|to|you|we|they)\b|step \d|first,|then _|finally|the secret to|the key to|all it takes|profit/i, want: { activity: 1.1, event: 0.9 } },
   { name: 'award-for', test: /award|prize|medal|trophy|champion|winner|nominated|hall of fame|world series|olympic|\bbest _/i, want: { activity: 1.2, event: 0.5 } },
   { name: 'doing-together', test: /enjoy _|\b_ together|good at _|time for _|involved with _|addicted to _|hooked on _/i, want: { activity: 1, object: 0.7 } },
-  { name: 'teach', test: /teach|learn(ing)?|lesson|demonstrate|explain|show you how|class|homework|professor|school/i, want: { activity: 1.1, object: 0.6 } },
+  { name: 'teach', test: /teach|\blearn(ing)?\b|lesson|demonstrate|explain|show you how|\bclass\b|homework|professor|school/i, want: { activity: 1.1, object: 0.6 } },
   { name: 'try-it', test: /if you try|dare you|betcha|\btry(ing)? _|\bbet \w+ (can|could)|five bucks/i, want: { activity: 1, object: 0.7 } },
 
   { name: 'guilty-pleasure', test: /guilty pleasure|secret(ly)?|hiding|private/i, want: { activity: 1, object: 0.7 } },
@@ -219,6 +253,8 @@ const DEFAULT_WANT: KindVector = {
 
 export interface Expectation {
   want: KindVector
+  /** The setup is doing an advertising voice, which is a register to ruin. */
+  promotional: boolean
   sound: boolean
   smell: boolean
   taste: boolean
@@ -229,18 +265,20 @@ export interface Expectation {
 export function expectationOf(setupText: string): Expectation {
   const want = { ...DEFAULT_WANT }
   let matched = 0
+  let promotional = false
   const senses = { sound: false, smell: false, taste: false }
 
   for (const frame of FRAMES) {
     if (!frame.test.test(setupText)) continue
     matched++
+    if (frame.name === 'slogan') promotional = true
     for (const kind of KINDS) {
       const add = frame.want[kind]
       if (add !== undefined) want[kind] += add
     }
     if (frame.sense) senses[frame.sense] = true
   }
-  return { want, ...senses, matched }
+  return { want, promotional, ...senses, matched }
 }
 
 /** For the coverage test: a frame that fires on one card is a special case. */
