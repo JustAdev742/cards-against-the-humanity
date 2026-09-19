@@ -5,3 +5,6 @@ dist/
 .vite/
 tsconfig.tsbuildinfo
 test/screenshots/
+public/music/*.webm
+public/music/*.mp3
+public/music/*.ogg

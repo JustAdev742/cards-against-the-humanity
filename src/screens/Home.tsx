@@ -1,6 +1,4 @@
-import { motion, useReducedMotion } from 'motion/react'
-
-import { deckSize } from '../game/engine.ts'
+import { DECK_COUNTS } from '../data/counts.ts'
 import { CardMark } from '../ui/Card.tsx'
 
 /**
@@ -9,32 +7,25 @@ import { CardMark } from '../ui/Card.tsx'
  * Picking a door is picking up the card that is yours.
  */
 export function Home({ onHost, onJoin }: { onHost: () => void; onJoin: () => void }) {
-  const reduced = useReducedMotion()
-  const rise = (delay: number) =>
-    reduced
-      ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.2 } }
-      : {
-          initial: { opacity: 0, y: 22 },
-          animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.5, delay, ease: [0.22, 1, 0.36, 1] as const },
-        }
+  /** Staggered entrance: each element carries `rise` and its own delay. */
+  const rise = (delay: number) => ({ style: { animationDelay: `${delay}s` } })
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 pb-10 pt-[max(1.5rem,var(--inset-top))]">
-      <motion.header {...rise(0)} className="flex items-center gap-3">
+      <header {...rise(0)} className="rise flex items-center gap-3">
         <CardMark className="w-6 text-paper" />
         <h1 className="label text-paper!">Cards Against The Humanity</h1>
-      </motion.header>
+      </header>
 
       <div className="flex flex-1 flex-col justify-center gap-10 py-12">
-        <motion.p
+        <p
           {...rise(0.06)}
-          className="max-w-xl text-balance text-3xl font-extrabold leading-[1.1] tracking-[-0.03em] sm:text-5xl"
+          className="rise max-w-xl text-balance text-3xl font-extrabold leading-[1.1] tracking-[-0.03em] sm:text-5xl"
         >
           The TV is the table. Everybody’s phone is their hand.
-        </motion.p>
+        </p>
 
-        <motion.div {...rise(0.14)} className="grid gap-4 sm:grid-cols-2 sm:gap-6">
+        <div {...rise(0.14)} className="rise grid gap-4 sm:grid-cols-2 sm:gap-6">
           <DoorCard
             tone="black"
             eyebrow="On the big screen"
@@ -51,12 +42,12 @@ export function Home({ onHost, onJoin }: { onHost: () => void; onJoin: () => voi
             action="Join a table"
             onClick={onJoin}
           />
-        </motion.div>
+        </div>
       </div>
 
-      <motion.footer {...rise(0.22)} className="border-t border-line pt-5 text-sm text-ash">
+      <footer {...rise(0.22)} className="rise border-t border-line pt-5 text-sm text-ash">
         <p className="m-0">
-          {deckSize.black} black cards and {deckSize.white} white cards: the whole 2022
+          {DECK_COUNTS.black} black cards and {DECK_COUNTS.white} white cards: the whole 2022
           print-and-play deck. Three players or more. Nothing to install.
         </p>
         <p className="m-0 mt-2">
@@ -72,7 +63,7 @@ export function Home({ onHost, onJoin }: { onHost: () => void; onJoin: () => voi
           </a>
           . This is an unofficial, non-commercial way to play it.
         </p>
-      </motion.footer>
+      </footer>
     </main>
   )
 }
@@ -104,7 +95,7 @@ function DoorCard({
       }
     >
       <div>
-        <span className={`label ${isWhite ? 'text-ash-ink!' : ''}`}>{eyebrow}</span>
+        <span className={`label ${isWhite ? 'text-ash-ink!' : 'text-ash-bright!'}`}>{eyebrow}</span>
         <p className="m-0 mt-3 text-3xl leading-[1.05] tracking-[-0.025em] sm:text-4xl">
           {headline}
         </p>

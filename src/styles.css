@@ -138,6 +138,17 @@ body {
   padding-bottom: 0.02em;
 }
 
+/* The front page entrance. Done in CSS so the home route does not have to
+   pull an animation library in before it can draw anything. */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: none; }
+}
+
+.rise {
+  animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

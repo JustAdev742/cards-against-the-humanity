@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 
+import { tapPlayed, tapSelect, tapWon, tapYourTurn } from '../audio/haptics.ts'
 import { MIN_PLAYERS, RANDO_ID } from '../game/types.ts'
 import { rememberName, rememberedName, useClient, useWakeLock } from '../net/hooks.ts'
 import type { Client, ClientSnapshot } from '../net/client.ts'
@@ -9,6 +10,7 @@ import { BlackCardFace, CardMark, WhiteCard, blackCardSentence } from '../ui/Car
 import { Button } from '../ui/Button.tsx'
 import { ConfirmButton } from '../ui/ConfirmButton.tsx'
 import { DeckChoice } from '../ui/DeckChoice.tsx'
+import { TargetScore } from '../ui/TargetScore.tsx'
 import { CodeInput } from '../ui/CodeInput.tsx'
 import { PlayerChip, PlayerDot } from '../ui/PlayerChip.tsx'
 
@@ -185,6 +187,19 @@ function Seat({
 }) {
   const me = table.players.find((p) => p.id === self.playerId)
 
+  // A phone spends the round in a pocket. Buzz when it needs its owner back.
+  const lastCue = useRef('')
+  useEffect(() => {
+    const cue = `${table.round}:${table.phase}:${self.isCzar}`
+    if (cue === lastCue.current) return
+    lastCue.current = cue
+
+    if (table.phase === 'writing' && !self.isCzar && !self.submitted) tapYourTurn()
+    if (table.phase === 'writing' && self.isCzar) tapYourTurn()
+    if (table.phase === 'judging' && self.isCzar) tapYourTurn()
+    if (table.phase === 'roundEnd' && table.winnerId === self.playerId) tapWon()
+  }, [table.round, table.phase, table.winnerId, self.isCzar, self.submitted, self.playerId])
+
   return (
     <>
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3 pt-[max(0.75rem,var(--inset-top))]">
@@ -294,6 +309,11 @@ function PhoneLobby({
               counts={table.deckCounts}
               onChange={(deck) => client?.send({ type: 'setOptions', deck })}
             />
+            <TargetScore
+              size="phone"
+              value={table.targetScore}
+              onChange={(targetScore) => client?.send({ type: 'setOptions', targetScore })}
+            />
             <label className="flex cursor-pointer items-start gap-3 text-sm text-ash-bright">
               <input
                 type="checkbox"
@@ -311,7 +331,7 @@ function PhoneLobby({
         ) : (
           <p className="m-0 text-sm text-ash">
             {table.deck === 'family' ? 'Family deck' : 'Full deck'}: {table.deckCounts.white} white
-            cards, {table.deckCounts.black} black.
+            cards, {table.deckCounts.black} black. Playing to {table.targetScore}.
           </p>
         )}
       </div>
@@ -339,6 +359,7 @@ function PhoneWriting({
   useEffect(() => {
     setPicked([])
     client?.clearMoveError()
+    tapSelect()
   }, [table.round, client])
 
   if (self.isCzar) {
@@ -388,6 +409,7 @@ function PhoneWriting({
   const play = () => {
     const cards = picked.map((key) => self.hand[Number(key)])
     client?.send({ type: 'play', cards })
+    tapPlayed()
   }
 
   return (

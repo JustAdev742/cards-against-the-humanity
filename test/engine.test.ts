@@ -26,6 +26,7 @@ import {
   startGame,
 } from '../src/game/engine.ts'
 import { MAX_PLAYERS, RANDO_ID, type GameState } from '../src/game/types.ts'
+import { DECK_COUNTS } from '../src/data/counts.ts'
 
 const SEED = 12345
 
@@ -405,4 +406,17 @@ test('switching decks in the lobby swaps the cards out', () => {
   startGame(state)
   setDeck(state, 'full')
   assert.equal(state.options.deck, 'family')
+})
+
+test('the published deck counts match the decks', () => {
+  // Home shows these as literals to keep the decks out of the first chunk.
+  assert.deepEqual(
+    { ...DECK_COUNTS },
+    {
+      black: deckSize.black,
+      white: deckSize.white,
+      familyBlack: deckCounts('family').black,
+      familyWhite: deckCounts('family').white,
+    },
+  )
 })

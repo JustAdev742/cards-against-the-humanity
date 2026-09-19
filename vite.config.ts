@@ -7,5 +7,21 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss()],
-  build: { target: 'es2022', chunkSizeWarningLimit: 700 },
+  build: {
+    target: 'es2022',
+    rollupOptions: {
+      output: {
+        // Split the big third-party pieces so a repeat visit only refetches
+        // what actually changed.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (/[\/]node_modules[\/](react|react-dom|scheduler)[\/]/.test(id)) return 'react'
+          if (id.includes('motion') || id.includes('framer')) return 'motion'
+          if (id.includes('peerjs')) return 'peer'
+          if (id.includes('qrcode')) return 'qr'
+          return 'vendor'
+        },
+      },
+    },
+  },
 })

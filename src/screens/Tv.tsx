@@ -1,7 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import QRCode from 'qrcode'
 
+import {
+  sfxCardFlip,
+  sfxCardPlayed,
+  sfxDeal,
+  sfxGameOver,
+  sfxJoin,
+  sfxWinner,
+} from '../audio/sfx.ts'
+import { useMusic, type Music } from '../audio/useMusic.ts'
 import { MIN_PLAYERS, RANDO_ID } from '../game/types.ts'
 import { useHost } from '../net/hooks.ts'
 import type { TableView } from '../net/protocol.ts'
@@ -10,12 +19,21 @@ import { Button } from '../ui/Button.tsx'
 import { ConfirmButton } from '../ui/ConfirmButton.tsx'
 import { DeckChoice } from '../ui/DeckChoice.tsx'
 import { PlayerChip, PlayerDot, playerColor } from '../ui/PlayerChip.tsx'
+import { MuteButton, SoundControls } from '../ui/SoundControls.tsx'
+import { TargetScore } from '../ui/TargetScore.tsx'
 
 /** How long the winning card stays up before the next round deals. */
 const WINNER_DWELL_MS = 7000
 
 export function Tv({ onExit }: { onExit: () => void }) {
   const { snapshot, host } = useHost({ targetScore: 7, rando: false })
+  const music = useMusic()
+
+  // The click that opened the table counts as the gesture browsers want
+  // before they will play sound, so the track can start as soon as it loads.
+  useEffect(() => {
+    if (music.available && !music.playing) music.start()
+  }, [music])
 
   if (!snapshot) return <TvMessage title="Setting the table" detail="Opening a room…" />
   if (snapshot.status === 'error') {
@@ -29,16 +47,18 @@ export function Tv({ onExit }: { onExit: () => void }) {
     return <TvMessage title="Setting the table" detail="Reaching the matchmaking service…" />
   }
 
-  return <TvTable table={snapshot.table} host={host} onExit={onExit} />
+  return <TvTable table={snapshot.table} host={host} music={music} onExit={onExit} />
 }
 
 function TvTable({
   table,
   host,
+  music,
   onExit,
 }: {
   table: TableView
   host: ReturnType<typeof useHost>['host']
+  music: Music
   onExit: () => void
 }) {
   // The winning card holds the screen for a beat, then the next round deals.
@@ -48,9 +68,49 @@ function TvTable({
     return () => clearTimeout(timer)
   }, [table.phase, table.round, host])
 
+  // Sound follows the table rather than the clicks, so it fires for whatever
+  // the phones did, not just for what happened on this screen.
+  const previous = useRef({ phase: table.phase, played: 0, revealed: 0, players: 0 })
+  useEffect(() => {
+    const was = previous.current
+    const revealed = table.revealed.length
+
+    if (table.phase === 'lobby' && table.players.length > was.players) sfxJoin()
+    if (table.phase === 'writing' && was.phase !== 'writing') sfxDeal()
+    if (table.phase === 'writing' && table.submissionCount > was.played) sfxCardPlayed()
+    if (table.phase === 'judging' && revealed > was.revealed) sfxCardFlip()
+    if (table.phase === 'roundEnd' && was.phase !== 'roundEnd') {
+      sfxWinner()
+      music.duck(4)
+    }
+    if (table.phase === 'gameOver' && was.phase !== 'gameOver') {
+      sfxGameOver()
+      music.duck(6)
+    }
+
+    previous.current = {
+      phase: table.phase,
+      played: table.submissionCount,
+      revealed,
+      players: table.players.length,
+    }
+  }, [table, music])
+
+  // A TV is usually driven by a remote or a stray keyboard, not a mouse.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const el = event.target as HTMLElement | null
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return
+      if (event.key === 'm' || event.key === 'M') music.toggleMuted()
+      if (event.key === 'Enter' && table.phase === 'lobby') host?.startGame()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [music, host, table.phase])
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-ink">
-      <TopRail table={table} onExit={onExit} />
+      <TopRail table={table} music={music} onExit={onExit} />
 
       <main className="relative min-h-0 flex-1">
         {/* The TV shows no visible heading — a heading would be furniture on
@@ -65,7 +125,7 @@ function TvTable({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.28 }}
           >
-            {table.phase === 'lobby' && <Lobby table={table} host={host} />}
+            {table.phase === 'lobby' && <Lobby table={table} host={host} music={music} />}
             {(table.phase === 'writing' || table.phase === 'judging') && <Round table={table} />}
             {table.phase === 'roundEnd' && <Winner table={table} />}
             {table.phase === 'gameOver' && <GameOver table={table} host={host} />}
@@ -99,7 +159,15 @@ function headingFor(table: TableView): string {
 
 /* ── Rails ──────────────────────────────────────────────────── */
 
-function TopRail({ table, onExit }: { table: TableView; onExit: () => void }) {
+function TopRail({
+  table,
+  music,
+  onExit,
+}: {
+  table: TableView
+  music: Music
+  onExit: () => void
+}) {
   return (
     <header className="flex shrink-0 items-center justify-between gap-6 border-b border-line px-[3vw] py-[1.4vh]">
       <div className="flex items-baseline gap-[1.6vw]">
@@ -114,6 +182,7 @@ function TopRail({ table, onExit }: { table: TableView; onExit: () => void }) {
         )}
       </div>
       <div className="flex items-center gap-[1.4vw]">
+        <MuteButton music={music} className="w-[min(1.8vw,1.5rem)]" />
         <span className="label text-[min(1.1vw,0.9rem)]!">Cards Against The Humanity</span>
         <CardMark className="w-[min(1.6vw,1.4rem)] text-ash" />
         <ConfirmButton
@@ -158,7 +227,15 @@ function BottomRail({ table }: { table: TableView }) {
 
 /* ── Lobby ──────────────────────────────────────────────────── */
 
-function Lobby({ table, host }: { table: TableView; host: ReturnType<typeof useHost>['host'] }) {
+function Lobby({
+  table,
+  host,
+  music,
+}: {
+  table: TableView
+  host: ReturnType<typeof useHost>['host']
+  music: Music
+}) {
   const qr = useJoinQr(table.code)
   const ready = table.players.filter((p) => p.connected).length
   const short = MIN_PLAYERS - ready
@@ -184,7 +261,7 @@ function Lobby({ table, host }: { table: TableView; host: ReturnType<typeof useH
         </p>
       </section>
 
-      <section className="flex min-w-0 flex-col justify-center gap-[2.5vh]">
+      <section className="flex min-w-0 flex-col justify-center gap-[2vh]">
         <div className="flex items-start gap-[2vw]">
           {qr && (
             <img
@@ -222,16 +299,24 @@ function Lobby({ table, host }: { table: TableView; host: ReturnType<typeof useH
           </div>
         </div>
 
-        <div className="border-t border-line pt-[2.5vh]">
+        <div className="grid grid-cols-[1fr_auto] gap-[2vw] border-t border-line pt-[2vh]">
           <DeckChoice
             size="tv"
             value={table.deck}
             counts={table.deckCounts}
             onChange={(deck) => host?.setOptions({ deck })}
           />
+          <TargetScore
+            value={table.targetScore}
+            onChange={(targetScore) => host?.setOptions({ targetScore })}
+          />
         </div>
 
-        <div className="border-t border-line pt-[2.5vh]">
+        <div className="border-t border-line pt-[2vh]">
+          <SoundControls music={music} />
+        </div>
+
+        <div className="border-t border-line pt-[2vh]">
           {short > 0 ? (
             <p className="m-0 text-[min(1.7vw,1.4rem)] font-bold text-ash-bright">
               {short} more {short === 1 ? 'player' : 'players'} and you can start.
@@ -246,7 +331,7 @@ function Lobby({ table, host }: { table: TableView; host: ReturnType<typeof useH
               </p>
             </div>
           )}
-          <label className="mt-[2vh] flex w-fit cursor-pointer items-center gap-3 text-[min(1.3vw,1.05rem)] text-ash-bright">
+          <label className="mt-[1.6vh] flex w-fit cursor-pointer items-center gap-3 text-[min(1.3vw,1.05rem)] text-ash-bright">
             <input
               type="checkbox"
               checked={table.rando}
