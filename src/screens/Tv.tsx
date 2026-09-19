@@ -173,13 +173,14 @@ function Lobby({ table, host }: { table: TableView; host: ReturnType<typeof useH
         >
           <span translate="no">{table.code}</span>
         </p>
-        {/* The address people type. A project path can be long, so it steps
-            down to stay on one line rather than breaking mid-word. */}
-        <p
-          className="m-0 mt-[2.5vh] font-bold leading-tight text-ash-bright"
-          style={{ fontSize: `min(${Math.min(2, 46 / joinHost().length)}vw, 1.9rem)` }}
-        >
-          {joinHost()}
+        {/* The address people type. A project path can be long, so it breaks
+            after the domain rather than shrinking to something nobody can read
+            from a sofa, or wrapping mid-word. */}
+        <p className="m-0 mt-[2.5vh] font-bold leading-[1.15] text-ash-bright">
+          <span className="block text-[min(2vw,1.9rem)]">{joinAddress().host}</span>
+          {joinAddress().path && (
+            <span className="block text-[min(1.5vw,1.45rem)] text-ash">{joinAddress().path}</span>
+          )}
         </p>
       </section>
 
@@ -529,10 +530,9 @@ function TvMessage({
   )
 }
 
-/** The address players type, without the scheme or a trailing slash. */
-function joinHost(): string {
-  const path = location.pathname.replace(/\/$/, '')
-  return `${location.host}${path}`
+/** The address players type, split so it can break after the domain. */
+function joinAddress(): { host: string; path: string } {
+  return { host: location.host, path: location.pathname.replace(/\/$/, '') }
 }
 
 function useJoinQr(code: string): string | null {
