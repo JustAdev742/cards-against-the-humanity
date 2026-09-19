@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────
+   Cards Against The Humanity — design tokens
+
+   The physical game has exactly two colors. So does this. Meaning
+   is carried by inversion (black ↔ white), never by adding a hue.
+   The only hue in the app is a player's identity, and that is
+   always paired with their initial so color is never load-bearing.
+   ───────────────────────────────────────────────────────────── */
+@theme {
+  --color-ink: #000000;          /* the table */
+  --color-card-black: #1a1817;   /* a black card, warm enough to read as an object */
+  --color-paper: #ffffff;        /* a white card */
+  --color-paper-edge: #d9d5d1;   /* the cut edge of a card */
+  /* Muted text, checked against the surface it actually sits on:
+     ash 7.5:1 on the table, ash-ink 7.6:1 on a white card. A TV is read
+     from ten feet away, so both clear AAA rather than scraping AA. */
+  --color-ash: #9c9a97;          /* metadata on black */
+  --color-ash-bright: #b4b0ad;   /* metadata that has to carry across a room */
+  --color-ash-ink: #57534f;      /* metadata on a white card */
+  --color-line: #2e2b29;         /* hairlines on black */
+  --color-danger: #ff5a4a;
+
+  --font-display: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --radius-card: 14px;
+  --ease-card: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root {
+  color-scheme: dark;
+  --player-1: #ff6b4a;
+  --player-2: #4ac8ff;
+  --player-3: #ffd84a;
+  --player-4: #9b7bff;
+  --player-5: #4ae0a0;
+  --player-6: #ff7bc8;
+  --player-7: #c8e04a;
+  --player-8: #ff9e4a;
+  /* Safe-area insets, so phone UI clears the notch and home indicator. */
+  --inset-top: env(safe-area-inset-top, 0px);
+  --inset-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+
+/* No double-tap zoom and no 300ms delay on a phone that is being used as
+   a game controller. */
+button,
+label,
+input,
+a { touch-action: manipulation; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+
+/* Keyboard focus stays visible everywhere. Inversion is the language of
+   this UI, so the focus ring is a paper-colored outline on black. */
+:focus-visible {
+  outline: 3px solid var(--color-paper);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ── The card object ──────────────────────────────────────────
+   A card is a slab with a real edge. Both faces share geometry so
+   a flip reads as one object turning over, not two divs swapping. */
+.card-face {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-radius: var(--radius-card);
+  font-weight: 700;
+  letter-spacing: -0.021em;
+  line-height: 1.08;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.card-white {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  box-shadow:
+    0 1px 0 0 var(--color-paper-edge),
+    0 2px 0 0 #bfbab5,
+    0 10px 24px -6px rgb(0 0 0 / 0.85);
+}
+
+.card-black {
+  background: var(--color-card-black);
+  color: var(--color-paper);
+  box-shadow:
+    inset 0 0 0 1px #33302e,
+    0 10px 30px -8px rgb(0 0 0 / 0.9);
+}
+
+/* The back of a card: the game's own mark, never a texture. */
+.card-back {
+  background: var(--color-card-black);
+  box-shadow: inset 0 0 0 1px #33302e, 0 10px 24px -8px rgb(0 0 0 / 0.9);
+}
+
+.label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ash);
+}
+
+.mono { font-family: var(--font-mono); }
+
+/* A blank on a black card: the rule you write on. */
+.blank {
+  display: inline-block;
+  min-width: 3.2em;
+  border-bottom: 0.085em solid currentColor;
+  vertical-align: baseline;
+}
+
+/* A filled blank shows the played answer inline, underlined like the
+   handwriting it replaces. */
+.blank-filled {
+  border-bottom: 0.085em solid currentColor;
+  padding-bottom: 0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
