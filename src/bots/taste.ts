@@ -7,6 +7,7 @@ import {
   type CardFeatures,
   type SetupFeatures,
 } from './features.ts'
+import { asksASense, kindFit, senseFit } from './kinds.ts'
 
 /**
  * What a bot finds funny, as a set of weights over things that can actually
@@ -17,6 +18,12 @@ import {
 export interface Taste {
   /** Does the answer fit the hole grammatically. */
   fit: number
+  /** Is it even the kind of thing the question asked for. */
+  kind: number
+  /** A prim setup with an indecent answer. The other engine of the joke. */
+  clash: number
+  /** Can you picture it. A named thing beats a concept nearly every time. */
+  image: number
   /** How far the answer is from the setup's world. The engine of the joke. */
   contrast: number
   /** Bodily, childish. The whole register of the Family Edition. */
@@ -44,16 +51,22 @@ export interface Personality {
 }
 
 const BASE: Taste = {
-  fit: 1,
-  contrast: 1,
-  gross: 0.35,
-  crude: 0.3,
-  concrete: 0.45,
-  punch: 0.35,
-  abstract: -0.3,
-  echo: -0.7,
-  chaos: 0.35,
+  fit: 1.1,
+  kind: 2.4,
+  clash: 0.9,
+  image: 1.3,
+  contrast: 0.7,
+  gross: 0.4,
+  crude: 0.35,
+  concrete: 0.3,
+  punch: 0.12,
+  abstract: -1.1,
+  echo: -0.8,
+  chaos: 0.3,
 }
+
+/** The table's shared sense of humour, before anyone's personality bends it. */
+export const CONSENSUS: Taste = BASE
 
 const mix = (over: Partial<Taste>): Taste => ({ ...BASE, ...over })
 
@@ -66,39 +79,45 @@ export const PERSONALITIES: Personality[] = [
     kind: 'bex',
     name: 'Bex',
     blurb: 'Goes straight for the rudest thing in her hand.',
-    taste: mix({ crude: 1.1, gross: 0.9, contrast: 0.7, abstract: -0.6, chaos: 0.3 }),
+    taste: mix({ crude: 1.2, gross: 1, clash: 2.2, contrast: 0.5, abstract: -1.2, chaos: 0.3 }),
   },
   {
     kind: 'wendell',
     name: 'Wendell',
     blurb: 'Deadpan. Answers a lurid question with something painfully ordinary.',
-    taste: mix({ contrast: 1.5, crude: -0.5, gross: -0.2, punch: 0.6, concrete: 0.6, chaos: 0.2 }),
+    taste: mix({
+      kind: 2.8, contrast: 1.4, clash: 0.1, crude: -0.5, gross: -0.2,
+      punch: 0.45, image: 1.1, chaos: 0.2,
+    }),
   },
   {
     kind: 'nadia',
     name: 'Nadia',
     blurb: 'Absurdist. The stranger and more specific, the better.',
-    taste: mix({ contrast: 1.3, concrete: 1.0, punch: -0.2, abstract: -0.8, chaos: 0.55 }),
+    taste: mix({
+      kind: 1.7, contrast: 1.5, image: 1.9, punch: -0.25, abstract: -1.4, chaos: 0.5,
+    }),
   },
   {
     kind: 'ozzy',
     name: 'Ozzy',
     blurb: 'Likes a name, a number, a brand. Something you can picture.',
-    taste: mix({ concrete: 1.3, contrast: 0.8, punch: 0.5, abstract: -0.9, chaos: 0.25 }),
+    taste: mix({ image: 2.1, concrete: 1.2, contrast: 0.6, punch: 0.3, abstract: -1.5, chaos: 0.25 }),
   },
   {
     kind: 'hutch',
     name: 'Hutch',
     blurb: 'Plays it straight. Whatever reads best in the sentence.',
-    taste: mix({ fit: 2.2, contrast: 0.5, punch: 0.5, echo: -1, chaos: 0.15 }),
+    taste: mix({ fit: 2.4, kind: 3.2, contrast: 0.35, clash: 0.4, echo: -1, chaos: 0.15 }),
   },
   {
     kind: 'pip',
     name: 'Pip',
     blurb: 'Chaotic. Often wrong, occasionally perfect.',
-    taste: mix({ contrast: 0.9, gross: 0.6, concrete: 0.4, chaos: 1.1 }),
+    taste: mix({ kind: 1.4, contrast: 1, gross: 0.8, clash: 1.2, chaos: 1.1 }),
   },
 ]
+
 
 export const personalityFor = (kind: string): Personality =>
   PERSONALITIES.find((p) => p.kind === kind) ?? PERSONALITIES[0]
@@ -108,6 +127,9 @@ export const personalityFor = (kind: string): Personality =>
 /** The measurable qualities of a pairing, before anybody's taste is applied. */
 export interface Signals {
   fit: number
+  kind: number
+  clash: number
+  image: number
   contrast: number
   gross: number
   crude: number
@@ -129,14 +151,29 @@ export function signalsFor(setup: SetupFeatures, answer: CardFeatures, slot: num
   if (blank?.afterArticle && answer.gerund) fit -= 0.3
   if (setup.isQuestion && answer.gerund) fit -= 0.1
 
+  // Is it the right sort of thing at all? When the setup asked about a sense,
+  // that answer counts for more than the general shape of the noun phrase.
+  let kind = kindFit(setup.expect.want, answer.kinds)
+  if (asksASense(setup.expect)) {
+    kind = Math.max(kind * 0.55, senseFit(setup.expect, answer.text))
+  }
+
+  // A prim setup and an indecent answer. The stiffer the frame, the harder
+  // the card lands — which is the whole trick the printed deck runs on.
+  const prim = clamp01(setup.formal * 0.45 + setup.wholesome * 0.35)
+  const rude = clamp01((answer.crude * 0.6 + answer.gross * 0.5) / 1.5)
+
   return {
     fit: clamp01(fit),
+    kind,
+    clash: prim * rude,
+    image: answer.image,
     contrast: domainDistance(setup, answer),
     gross: clamp01(answer.gross / 2),
     crude: clamp01(answer.crude / 2),
     concrete: clamp01(answer.concrete / 2),
     punch: clamp01(1 - answer.length / 110),
-    abstract: clamp01(answer.abstract),
+    abstract: clamp01(answer.kinds.quality / 1.5),
     echo: echo(setup, answer),
   }
 }
@@ -144,6 +181,9 @@ export function signalsFor(setup: SetupFeatures, answer: CardFeatures, slot: num
 export function scoreWith(signals: Signals, taste: Taste): number {
   return (
     signals.fit * taste.fit +
+    signals.kind * taste.kind +
+    signals.clash * taste.clash +
+    signals.image * taste.image +
     signals.contrast * taste.contrast +
     signals.gross * taste.gross +
     signals.crude * taste.crude +
@@ -157,7 +197,7 @@ export function scoreWith(signals: Signals, taste: Taste): number {
 /* ── Learning who likes what ────────────────────────────────── */
 
 const LEARNED_KEYS = [
-  'contrast', 'gross', 'crude', 'concrete', 'punch', 'abstract', 'echo',
+  'kind', 'clash', 'image', 'contrast', 'gross', 'crude', 'concrete', 'punch', 'abstract', 'echo',
 ] as const
 type LearnedKey = (typeof LEARNED_KEYS)[number]
 
@@ -221,7 +261,11 @@ export function tasteForJudge(taste: Taste, model: JudgeModel | undefined): Tast
 function pick<T>(ranked: { item: T; score: number }[], chaos: number, rand: () => number): T {
   const top = ranked.slice(0, Math.max(2, Math.min(5, ranked.length)))
   if (chaos <= 0.01 || top.length === 1) return top[0].item
-  const temp = Math.max(0.1, chaos)
+  // Chaos is a share of the spread, not an absolute number of points. Without
+  // that, adding a heavily weighted signal quietly turns every bot deterministic
+  // and the whole table plays the same card.
+  const spread = top[0].score - top[top.length - 1].score
+  const temp = Math.max(0.05, chaos * Math.max(0.15, spread))
   const weights = top.map((r) => Math.exp((r.score - top[0].score) / temp))
   const total = weights.reduce((a, b) => a + b, 0)
   let roll = rand() * total

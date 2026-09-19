@@ -97,31 +97,62 @@ person turns up.
 
 There is no table of pre-scored card combinations anywhere in this project, and
 deliberately so: a lookup table only knows the pairs somebody sat down and
-scored, and would have nothing to say about a card it had not seen. Instead a
-bot measures a few things it can work out about any pairing —
+scored, and would have nothing to say about a card it had not seen. A bot works
+out the answer from the sentence in front of it.
 
-- **Fit.** "I was bitten by a ___" plus "A bear." reads "a a bear". Blanks that
-  follow *a* or *the* are found by reading the setup, so this works on cards
-  nobody has written yet.
+**What is the hole asking for?** This is the part that matters most. A card is
+sorted into what sort of thing it is — a person, a place, an object, something
+you do, something that happens, or an abstraction — and the setup is read for
+what it is reaching for. "What's that sound?" wants something that makes a
+noise, so the Pope is out and a fart is in. "Because of ___" wants a cause.
+"Ask me anything" wants somebody. "Betcha can't have just one" wants something
+you could eat.
+
+Those frames are ordinary English rather than notes about particular cards —
+"because of X" wants a cause whichever card it turns up in — and a test refuses
+any frame that only matches one card in the printed decks, so this cannot
+quietly rot into a lookup table.
+
+The rest of what a bot weighs:
+
+- **Register clash.** A prim setup with an indecent answer. The stiffer the
+  frame, the harder the card lands, which is the trick the printed deck runs on.
 - **Contrast.** Each card gets a vector over thirteen little worlds — school,
-  money, the body, the supernatural — and the distance between the setup's world
-  and the answer's is the engine of most of these jokes.
-- **Register.** How bodily it is, how crude, how abstract, how concrete
-  (proper nouns and numbers: things you can picture).
-- **Punch.** Short answers land harder after a long setup.
-- **Echo.** An answer that borrows the setup's own words back usually reads flat.
+  money, the body, the supernatural — and the distance between the setup's
+  world and the answer's is most of the rest of the joke.
+- **Can you picture it.** A named thing beats a category, and both beat an
+  abstraction. "Shame." is almost never the funny card.
+- **Grammar.** "I was bitten by a ___" plus "A bear." reads "a a bear". Blanks
+  that follow *a* or *the* are found by reading the setup, so this works on
+  cards nobody has written yet.
+- **Echo.** An answer that borrows the setup's own words back reads flat.
 
-Each bot weighs those differently, which is the whole point — a table where
+Six personalities weigh those differently, which is the point — a table where
 every bot plays the same card is not a game. Bex goes for the rudest thing in
 her hand; Wendell answers a lurid question with something painfully ordinary;
 Nadia wants the strangest and most specific card; Ozzy wants a name or a number;
-Hutch plays whatever reads best in the sentence; Pip is chaotic and will lose
-more than the others. They pick by a softmax over their best few cards rather
-than always taking the top one, so the same bot with the same hand does not
-play the same card twice.
+Hutch plays whatever reads best in the sentence; Pip is chaotic and loses more
+than the others. Dealt the same hand, the six of them find about three different
+cards between them, and all six agree less than 3% of the time.
 
 For a Pick 2 the holes are filled together rather than one at a time, because
 two answers out of the same world read as one flat idea.
+
+### Is any of that actually working?
+
+A bot beating a random player is not evidence when the judge is another bot
+running the same scorer — they agree by construction. So there is a held-out
+benchmark of twenty pairings instead: a real setup, the card a person would
+obviously pick, and real cards from the same deck that obviously do not work.
+Nothing in the model is allowed to know about them, and a test proves it by
+rewording the setups and checking the answer does not move.
+
+The first version of this scored **8 out of 20** — it would answer "What's that
+sound?" with "Former President George W. Bush." The current one scores **20**.
+
+The other measurements, for what they are worth: against six bots and one seat
+that just plays off the top of its hand, the random seat wins 2.4% of rounds
+where an even split would be 14.3%.
 
 ### They work out who they are playing with
 
@@ -135,7 +166,7 @@ The nudge is bounded, so a bot never entirely stops being itself, and it is
 forgotten when the table closes. Nothing is sent anywhere.
 
 Over three thousand simulated rounds, a bot that watches the judge beats an
-identical twin that does not by 56–80%, depending on the judge — and falls back
+identical twin that does not by 51–75%, depending on the judge — and falls back
 to about 50% against Pip, who is genuinely unpredictable. That is the result you
 want: there is nothing to learn from a judge who is picking at random.
 
@@ -244,7 +275,8 @@ src/
   data/          The four decks, transcribed from the printed boxes:
                  black/white.json and family-black/family-white.json.
   game/          Rules. Pure functions, no network, no React.
-  bots/          What a bot finds funny. Also pure, also testable.
+  bots/          What a bot finds funny: what kind of thing a hole wants,
+                 the lexicons, and the taste weights. Pure, and testable.
   net/           Host (the table), clients over WebRTC or in the same tab,
                  public table discovery, and the message protocol.
   audio/         Music, synthesised cues, phone haptics.

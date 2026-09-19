@@ -216,3 +216,40 @@ test('a bot learns nothing from a round it has no losers to compare against', ()
   const card: BlackCard = { t: 'What is that smell? _', p: 1 }
   assert.deepEqual(learnFrom({}, card, ['Fiery poops.'], []), {})
 })
+
+/* ── The table has to disagree with itself ──────────────────── */
+
+test('six bots dealt the same hand do not all play the same card', () => {
+  // A heavily weighted signal can quietly make every bot deterministic, and
+  // then the table stops being a game. This is the guard against that.
+  const rand = seeded(2024)
+  const rounds = 400
+  let distinct = 0
+  let unanimous = 0
+  for (let i = 0; i < rounds; i++) {
+    const card = BLACK[Math.floor(rand() * BLACK.length)]
+    const hand = deal(WHITE, 10, rand)
+    const picks = new Set(
+      PERSONALITIES.map((p) => chooseCards(card, hand, p.taste, undefined, rand).join('|')),
+    )
+    distinct += picks.size
+    if (picks.size === 1) unanimous++
+  }
+  const average = distinct / rounds
+  assert.ok(average >= 2.4, `the table only found ${average.toFixed(2)} different cards out of 6`)
+  assert.ok(unanimous / rounds < 0.1, `all six agreed ${((100 * unanimous) / rounds).toFixed(1)}% of the time`)
+})
+
+test('a bot still knows the difference between a good card and a bad one', () => {
+  // Variety is not the same as guessing: given one obviously right answer and
+  // nine abstractions, it should still find it nearly every time.
+  const card: BlackCard = { t: 'What’s that smell?', p: 1 }
+  const duds = ['Hope.', 'Shame.', 'Silence.', 'White privilege.', 'Complaining.',
+    'Pretending to care.', 'Crippling debt.', 'Daddy issues.', 'A positive attitude!']
+  let found = 0
+  for (let i = 0; i < 100; i++) {
+    const played = chooseCards(card, ['Boogers.', ...duds], personalityFor('hutch').taste, undefined, seeded(i))
+    if (played[0] === 'Boogers.') found++
+  }
+  assert.ok(found >= 85, `only found the one real answer ${found} times in 100`)
+})

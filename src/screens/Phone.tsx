@@ -79,7 +79,10 @@ function PhoneSeat({
 }
 
 export function Shell({ children }: { children: React.ReactNode }) {
-  return <main className="flex min-h-dvh flex-col bg-ink">{children}</main>
+  // h-dvh, not min-h-dvh. A minimum lets the column grow past the screen, and
+  // then the hand stops scrolling and pushes the Play button off the bottom
+  // instead — which is exactly what it did.
+  return <main className="flex h-dvh flex-col overflow-hidden bg-ink">{children}</main>
 }
 
 /* ── Getting in ─────────────────────────────────────────────── */
@@ -330,7 +333,7 @@ function PhoneLobby({
   const short = MIN_PLAYERS - ready
 
   return (
-    <div className="flex flex-1 flex-col gap-6 px-5 py-6 pb-[max(1.5rem,var(--inset-bottom))]">
+    <div className="flex min-h-0 overflow-y-auto overscroll-contain flex-1 flex-col gap-6 px-5 py-6 pb-[max(1.5rem,var(--inset-bottom))]">
       <div>
         <h2 className="m-0 text-2xl font-extrabold tracking-[-0.02em]">You’re in.</h2>
         <p className="m-0 mt-1 text-ash-bright">
@@ -468,7 +471,7 @@ function PhoneWriting({
 
   if (self.submitted) {
     return (
-      <div className="flex flex-1 flex-col gap-5 px-5 py-6">
+      <div className="flex min-h-0 overflow-y-auto overscroll-contain flex-1 flex-col gap-5 px-5 py-6">
         <p className="label">Handed in. Waiting for everyone else</p>
         <ul className="flex flex-col gap-3">
           {self.submitted.map((card, index) => (
@@ -540,6 +543,9 @@ function PhoneWriting({
                 type="button"
                 onClick={() => toggle(index)}
                 aria-pressed={isPicked}
+                // A card's text sits inside an <article>, which does not lend
+                // its content to an ancestor button's name, so say it here.
+                aria-label={need > 1 && isPicked ? `${card} Chosen, position ${order + 1}.` : card}
                 className={
                   'block w-full cursor-pointer rounded-[14px] text-left transition-transform duration-150 ' +
                   'active:scale-[0.985] ' +
@@ -585,7 +591,7 @@ function PhoneWriting({
 
 function CzarWaiting({ table }: { table: TableView }) {
   return (
-    <div className="flex flex-1 flex-col gap-5 px-5 py-6">
+    <div className="flex min-h-0 overflow-y-auto overscroll-contain flex-1 flex-col gap-5 px-5 py-6">
       <p className="label">You’re the Card Czar. Read this out</p>
       {table.black && <BlackCardFace card={table.black} scale="1.5rem" className="min-h-48 p-5" />}
       <p className="m-0 text-ash-bright">
@@ -684,7 +690,7 @@ function PhoneJudging({
       </div>
 
       {!table.allRevealed ? (
-        <div className="flex flex-1 flex-col justify-center gap-6 px-5 py-6">
+        <div className="flex min-h-0 overflow-y-auto overscroll-contain flex-1 flex-col justify-center gap-6 px-5 py-6">
           <p className="m-0 text-center text-ash-bright">
             {table.revealed.length} of {table.submissionCount} read out.
           </p>
@@ -801,7 +807,7 @@ function PhoneRoundEnd({
   const youWon = table.winnerId === self.playerId
 
   return (
-    <div className="flex flex-1 flex-col gap-5 px-5 py-6 pb-[max(1.5rem,var(--inset-bottom))]">
+    <div className="flex min-h-0 overflow-y-auto overscroll-contain flex-1 flex-col gap-5 px-5 py-6 pb-[max(1.5rem,var(--inset-bottom))]">
       <p className="label">{youWon ? 'You took the round' : 'Round over'}</p>
       {table.black && (
         <BlackCardFace
@@ -843,7 +849,7 @@ function PhoneGameOver({
   const youWon = champion?.id === self.playerId
 
   return (
-    <div className="flex flex-1 flex-col gap-6 px-5 py-6 pb-[max(1.5rem,var(--inset-bottom))]">
+    <div className="flex min-h-0 overflow-y-auto overscroll-contain flex-1 flex-col gap-6 px-5 py-6 pb-[max(1.5rem,var(--inset-bottom))]">
       <div>
         <p className="label">Game over</p>
         <h2 className="m-0 mt-2 text-3xl font-extrabold tracking-[-0.03em]">

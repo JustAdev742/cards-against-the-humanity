@@ -121,6 +121,18 @@ export const FORMAL_WORDS = [
   'this season', 'next on', 'coming soon', 'brought to you by', 'new from',
 ]
 
+/**
+ * The voice of somebody being nice in front of children. A setup in this
+ * register is the one an indecent card does the most damage to.
+ */
+export const WHOLESOME_WORDS = [
+  'kids', 'children', 'students', 'class,', 'class ', 'teacher', 'school', 'grandma',
+  'grandpa', 'mommy', 'daddy', 'mom ', 'dad ', 'family', 'please', 'thank you', 'lovely',
+  'wonderful', 'sweetheart', 'honey', 'dear', 'precious', 'darling', 'sunshine', 'papa',
+  'bedtime', 'sleepover', 'birthday', 'christmas', 'easter', 'church', 'sunday', 'cute',
+  'safe', 'healthy', 'polite', 'good boy', 'good girl', 'young man', 'young lady',
+]
+
 /** Nothing you can point at. Abstractions are the weakest answers. */
 export const ABSTRACT_WORDS = [
   'hope', 'shame', 'sadness', 'happiness', 'love', 'freedom', 'justice', 'truth', 'silence',
