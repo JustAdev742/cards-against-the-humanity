@@ -1,6 +1,16 @@
-import { Suspense, lazy, useCallback, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 
 import { unlockAudio } from './audio/sfx.ts'
+import {
+  currentNav,
+  onNav,
+  pushNav,
+  replaceNav,
+  startNav,
+  unwindNav,
+  type Mode,
+  type Nav,
+} from './nav.ts'
 import { Home, LocalMenu } from './screens/Home.tsx'
 import { CardMark } from './ui/Card.tsx'
 
@@ -22,18 +32,6 @@ const HostedTable = lazy(() =>
   import('./screens/Online.tsx').then((m) => ({ default: m.HostedTable })),
 )
 
-type Mode =
-  'home' | 'local' | 'tv' | 'join' | 'online' | 'private' | 'public' | 'hostPrivate' | 'hostPublic'
-
-/** A code in the address bar means a QR scan or a shared link: go and join. */
-function codeFromUrl(): string {
-  const raw = new URLSearchParams(location.search).get('r') ?? ''
-  return raw
-    .replace(/[^A-Za-z]/g, '')
-    .toUpperCase()
-    .slice(0, 4)
-}
-
 /**
  * Shown while a screen's chunk arrives.
  *
@@ -51,71 +49,97 @@ function Loading() {
   )
 }
 
-export function App() {
-  const initialCode = codeFromUrl()
-  const [joinCode, setJoinCode] = useState(initialCode)
-  const [joinHint, setJoinHint] = useState<string | undefined>(undefined)
-  const [mode, setMode] = useState<Mode>(initialCode ? 'join' : 'home')
+const withoutCode = () => location.pathname
+const withCode = (code: string) => `${location.pathname}?r=${code}`
 
-  const goHome = useCallback(() => {
-    // Drop the room code so "Back" does not bounce straight into joining again.
-    if (location.search) history.replaceState(null, '', location.pathname)
-    setJoinCode('')
-    setJoinHint(undefined)
-    setMode('home')
+export function App() {
+  // currentNav, not openingNav: a reload restores history.state, and starting
+  // from a fresh guess instead left React saying "at the form" while history
+  // said "at the table" — so the phone never sat back down.
+  const [nav, setNav] = useState<Nav>(() => currentNav())
+
+  // The opening entry needs state of its own, or the first Back lands on an
+  // entry the app cannot describe.
+  useEffect(() => {
+    startNav(currentNav())
+    return onNav(setNav)
   }, [])
 
-  // Browsers only allow sound after a gesture. Opening a table is that
-  // gesture, so the table can make noise from the moment it appears.
-  const open = useCallback((next: Mode) => {
+  /** Forward, to a screen that can be backed out of. */
+  const go = useCallback((mode: Mode, extra: Partial<Nav> = {}) => {
+    // Opening a table is the gesture browsers want before they play sound.
     unlockAudio()
-    setMode(next)
+    const here = currentNav()
+    setNav(
+      pushNav(
+        { mode, code: extra.code ?? here.code, hint: extra.hint, seated: extra.seated ?? false },
+        mode === 'join' && (extra.code ?? here.code)
+          ? withCode(extra.code ?? here.code)
+          : undefined,
+      ),
+    )
+  }, [])
+
+  /**
+   * All the way out. Used by "End table" and by every screen's own way of
+   * leaving, so backing out of a game does not leave the dead table sitting
+   * one Back press away.
+   */
+  const goHome = useCallback(() => {
+    if (unwindNav()) return
+    // Nothing behind us: this page was opened on a link straight to a table.
+    setNav(pushNav({ mode: 'home', code: '', seated: false }, withoutCode()))
+  }, [])
+
+  /** The join screen telling us whether it is at the table or still asking. */
+  const setSeated = useCallback((seated: boolean, code: string) => {
+    const here = currentNav()
+    if (here.mode !== 'join' || here.seated === seated) return
+    setNav(
+      seated
+        ? pushNav({ mode: 'join', code, seated: true }, withCode(code))
+        : replaceNav({ mode: 'join', code, hint: here.hint, seated: false }, withCode(code)),
+    )
   }, [])
 
   const joinWith = useCallback(
     (code: string) => {
-      setJoinCode(code)
-      setJoinHint('Found a table with people at it. Pick a name and sit down.')
-      open('join')
+      go('join', { code, hint: 'Found a table with people at it. Pick a name and sit down.' })
     },
-    [open],
+    [go],
   )
+
+  const back = useCallback(() => history.back(), [])
 
   return (
     <Suspense fallback={<Loading />}>
-      {mode === 'home' && (
-        <Home onLocal={() => setMode('local')} onOnline={() => setMode('online')} />
+      {nav.mode === 'home' && <Home onLocal={() => go('local')} onOnline={() => go('online')} />}
+
+      {nav.mode === 'local' && (
+        <LocalMenu onHost={() => go('tv')} onJoin={() => go('join')} onBack={back} />
+      )}
+      {nav.mode === 'tv' && <Tv onExit={goHome} />}
+      {nav.mode === 'join' && (
+        <Phone
+          initialCode={nav.code}
+          hint={nav.hint}
+          seated={nav.seated}
+          onSeated={setSeated}
+          onExit={back}
+        />
       )}
 
-      {mode === 'local' && (
-        <LocalMenu onHost={() => open('tv')} onJoin={() => open('join')} onBack={goHome} />
+      {nav.mode === 'online' && (
+        <OnlineMenu onPrivate={() => go('private')} onPublic={() => go('public')} onBack={back} />
       )}
-      {mode === 'tv' && <Tv onExit={goHome} />}
-      {mode === 'join' && <Phone initialCode={joinCode} hint={joinHint} onExit={goHome} />}
-
-      {mode === 'online' && (
-        <OnlineMenu
-          onPrivate={() => setMode('private')}
-          onPublic={() => setMode('public')}
-          onBack={goHome}
-        />
+      {nav.mode === 'private' && (
+        <PrivateMenu onCreate={() => go('hostPrivate')} onJoin={() => go('join')} onBack={back} />
       )}
-      {mode === 'private' && (
-        <PrivateMenu
-          onCreate={() => open('hostPrivate')}
-          onJoin={() => open('join')}
-          onBack={() => setMode('online')}
-        />
+      {nav.mode === 'public' && (
+        <PublicSearch onFound={joinWith} onHost={() => go('hostPublic')} onBack={back} />
       )}
-      {mode === 'public' && (
-        <PublicSearch
-          onFound={joinWith}
-          onHost={() => open('hostPublic')}
-          onBack={() => setMode('online')}
-        />
-      )}
-      {mode === 'hostPrivate' && <HostedTable visibility="private" onExit={goHome} />}
-      {mode === 'hostPublic' && <HostedTable visibility="public" onExit={goHome} />}
+      {nav.mode === 'hostPrivate' && <HostedTable visibility="private" onExit={goHome} />}
+      {nav.mode === 'hostPublic' && <HostedTable visibility="public" onExit={goHome} />}
     </Suspense>
   )
 }

@@ -260,6 +260,23 @@ ffmpeg -i whatever.mp3 -vn -c:a libopus -b:a 64k public/music/tv-loop.webm
 Only bundle music you have the right to distribute — the file is served to
 everyone who opens the site.
 
+## Going back
+
+Every screen is a history entry, so the browser's Back button — and the back
+gesture, which on a phone is very easy to trigger by accident — walks back
+through the app instead of leaving the site. The in-app "← Back" buttons use
+the same stack rather than pushing a new screen, so the history does not grow
+as you move around.
+
+Backing out of a seat is the case worth getting right. It lands on the join
+form with the table code still in it, so getting back in is one tap, and going
+forward again returns you straight to your seat. Leaving a table properly —
+"End table", or a game's own way out — unwinds the whole way home in one go,
+so a dead table is never sitting one Back press away.
+
+The address bar only ever carries the table code, because that is the one
+thing worth scanning or sharing. Nobody needs a link to the settings menu.
+
 ## Keyboard
 
 The thing driving a TV is usually a laptop with a stray keyboard or a remote.
@@ -322,6 +339,7 @@ To point at your own PeerJS broker instead of the public one, add
 
 ```
 src/
+  nav.ts         Which screen you are on, kept in the browser's history.
   data/          The four decks, transcribed from the printed boxes:
                  black/white.json and family-black/family-white.json.
   game/          Rules. Pure functions, no network, no React.

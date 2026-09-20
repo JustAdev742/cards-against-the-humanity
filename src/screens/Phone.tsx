@@ -17,7 +17,14 @@ import { CodeInput } from '../ui/CodeInput.tsx'
 import { PlayerChip, PlayerDot } from '../ui/PlayerChip.tsx'
 import { SoundToggle } from '../ui/SoundControls.tsx'
 
-export function Phone(props: { initialCode: string; hint?: string; onExit: () => void }) {
+export function Phone(props: {
+  initialCode: string
+  hint?: string
+  /** True when history says this phone is at the table, not at the form. */
+  seated: boolean
+  onSeated: (seated: boolean, code: string) => void
+  onExit: () => void
+}) {
   return (
     <FeedbackProvider>
       <PhoneSeat {...props} />
@@ -28,27 +35,50 @@ export function Phone(props: { initialCode: string; hint?: string; onExit: () =>
 function PhoneSeat({
   initialCode,
   hint,
+  seated,
+  onSeated,
   onExit,
 }: {
   initialCode: string
   hint?: string
+  seated: boolean
+  onSeated: (seated: boolean, code: string) => void
   onExit: () => void
 }) {
+  // Whether this phone is at the table is a navigation fact, not a private
+  // one: it lives in history so that Back leaves the seat and returns to the
+  // form with the code still in it, rather than dropping out of the game.
+  const name = rememberedName().trim()
+  const entry = seated && initialCode.length === 4 && name ? { code: initialCode, name } : null
+
   // A phone that reloads mid-game — or that the browser quietly reloaded in a
   // background tab — already knows the table and the name. Making someone tap
   // through the form again while a round is waiting on them is not a welcome.
-  const [entry, setEntry] = useState<{ code: string; name: string } | null>(() => {
-    const name = rememberedName().trim()
-    return initialCode.length === 4 && name ? { code: initialCode, name } : null
-  })
+  //
+  // Once only: without the latch, backing out of the seat would land on the
+  // form and be sat straight back down again, and the Back button would look
+  // broken.
+  const satDownOnce = useRef(false)
+  // Any route to a seat counts, not just the automatic one: after joining by
+  // hand the name is remembered too, so without this the automatic path would
+  // fire on the way back and sit the player straight down again.
+  useEffect(() => {
+    if (seated) satDownOnce.current = true
+  }, [seated])
+  useEffect(() => {
+    if (seated || satDownOnce.current) return
+    if (initialCode.length !== 4 || !name) return
+    satDownOnce.current = true
+    onSeated(true, initialCode)
+  }, [seated, initialCode, name, onSeated])
   const { snapshot, client } = useClient(entry?.code ?? null, entry?.name ?? '')
 
   useWakeLock(snapshot?.status === 'connected')
 
   // A rejected name or a full table sends the player back to the form.
   useEffect(() => {
-    if (snapshot?.status === 'rejected') setEntry(null)
-  }, [snapshot?.status])
+    if (snapshot?.status === 'rejected') onSeated(false, initialCode)
+  }, [snapshot?.status, onSeated, initialCode])
 
   if (!entry) {
     return (
@@ -56,9 +86,9 @@ function PhoneSeat({
         initialCode={initialCode}
         hint={hint}
         notice={snapshot?.status === 'rejected' ? snapshot.notice : null}
-        onJoin={(code, name) => {
-          rememberName(name)
-          setEntry({ code, name })
+        onJoin={(code, joining) => {
+          rememberName(joining)
+          onSeated(true, code)
         }}
         onExit={onExit}
       />
@@ -70,7 +100,7 @@ function PhoneSeat({
       <Shell>
         <Connecting
           notice={snapshot?.notice ?? 'Looking for the table…'}
-          onExit={() => setEntry(null)}
+          onExit={() => onSeated(false, initialCode)}
         />
       </Shell>
     )
