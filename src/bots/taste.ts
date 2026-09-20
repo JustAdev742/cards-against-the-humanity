@@ -28,6 +28,8 @@ export interface Taste {
   /** How far the answer travels inside itself. An octopus smoking a cigarette
    *  is two ideas colliding; "A mistake." is none. */
   twist: number
+  /** Something alive turning up where a thing was expected. */
+  alive: number
   /** How far the answer is from the setup's world. The engine of the joke. */
   contrast: number
   /** Bodily, childish. The whole register of the Family Edition. */
@@ -56,6 +58,7 @@ const BASE: Taste = {
   clash: 1.8,
   vivid: 1.9,
   twist: 1.2,
+  alive: 0.35,
   contrast: 0.7,
   gross: 0.4,
   crude: 0.4,
@@ -127,6 +130,7 @@ export interface Signals {
   clash: number
   vivid: number
   twist: number
+  alive: number
   contrast: number
   gross: number
   crude: number
@@ -176,6 +180,10 @@ export function signalsFor(setup: SetupFeatures, answer: CardFeatures, slot: num
     clash: prim * rude,
     vivid: answer.image,
     twist: clamp01((answer.domainsTouched - 1) / 2),
+    // Something with a pulse, where the sentence was expecting an object.
+    // An audience in the bathroom and a sperm whale on an aeroplane are the
+    // same joke, and it is not one the other signals can see.
+    alive: clamp01(answer.kinds.person / 1.1) * clamp01(setup.expect.want.object / 2),
     contrast: domainDistance(setup, answer),
     gross: clamp01(answer.gross / 2),
     crude: clamp01(answer.crude / 2),
@@ -191,6 +199,7 @@ export function scoreWith(signals: Signals, taste: Taste): number {
     signals.clash * taste.clash +
     signals.vivid * taste.vivid +
     signals.twist * taste.twist +
+    signals.alive * taste.alive +
     signals.contrast * taste.contrast +
     signals.gross * taste.gross +
     signals.crude * taste.crude +
@@ -202,7 +211,7 @@ export function scoreWith(signals: Signals, taste: Taste): number {
 /* ── Learning who likes what ────────────────────────────────── */
 
 const LEARNED_KEYS = [
-  'kind', 'clash', 'vivid', 'twist', 'contrast', 'gross', 'crude', 'abstract', 'echo',
+  'kind', 'clash', 'vivid', 'twist', 'alive', 'contrast', 'gross', 'crude', 'abstract', 'echo',
 ] as const
 type LearnedKey = (typeof LEARNED_KEYS)[number]
 

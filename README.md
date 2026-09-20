@@ -124,7 +124,13 @@ joke at all. Past the gate, what decides it is:
   a voice worth ruining.
 - **How much of a picture it paints.** Detail is an asset, not a cost. "An
   octopus giving seven handjobs and smoking a cigarette" wins rounds that "A
-  mistake." never will.
+  mistake." never will. A card earns its imagery from what is actually in it —
+  physical words, names, numbers, bodily words, adjectives you could see — and
+  loses it for abstract morphology and concept words. There is no floor, because
+  a floor hands every unlisted abstraction the same score as a real picture.
+- **Something alive where a thing was expected.** An audience in the bathroom
+  and a sperm whale on an aeroplane are the same joke, and none of the other
+  signals can see it.
 - **How far the card travels inside itself.** An answer that collides two
   different worlds is doing something; one that names a single concept is not.
 - **Contrast** with the setup's own world, across thirteen little domains.
@@ -159,6 +165,15 @@ right sort of thing for the hole, and the only difference is that one of them is
 a joke. Passing the first benchmark alone only makes a bot literal-minded, and a
 literal-minded player is the worst one at the table. It scored 9 of 16 on the day
 that benchmark was written. It now scores 16.
+
+**Can it tell a picture from an idea?** Twenty-two cards you could photograph
+against twenty-four you could only argue about, every pair compared. This is the
+bluntest of the three and the one that stops "Boomers." and "The death penalty."
+turning up in a round where somebody else played nipple blades. It also refuses
+to let the scale saturate: when this was first measured, 33 cards were tied at
+the top of it and half the deck sat in a single narrow band, which is a model
+that has stopped telling anything from anything. It went from 94.3% of pairs the
+right way round, with 33 cards clamped, to 98.1% with one.
 
 The other measurement, for what it is worth: against six bots and one seat that
 just plays off the top of its hand, the random seat wins 2.4% of rounds where an

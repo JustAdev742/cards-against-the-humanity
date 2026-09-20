@@ -11,7 +11,7 @@
  * a test checks, so this cannot quietly become a lookup table.
  */
 
-import { lexicalHits } from './lexicon.ts'
+import { CRUDE_WORDS, GROSS_WORDS, lexicalHits } from './lexicon.ts'
 
 export const KINDS = ['person', 'place', 'object', 'activity', 'event', 'quality'] as const
 export type Kind = (typeof KINDS)[number]
@@ -42,6 +42,7 @@ const PERSON_WORDS = [
   'celebrity', 'hamburglar', 'batman', 'superman', 'spider-man', 'narc', 'bully', 'twin',
   'hero', 'villain', 'ghost', 'vampire', 'zombie', 'alien', 'caveperson', 'cavemen', 'caveman',
   'audience', 'crowd', 'mob ', 'choir', 'band', 'team', 'gang', 'army', 'class of', 'everyone',
+  'people', 'person', 'children', 'parents', 'folks', 'everybody', 'somebody', 'anybody',
 ]
 
 /** Somewhere you could stand. */
@@ -86,10 +87,39 @@ const QUALITY_WORDS = [
   'honor', 'honour', 'peace', 'chaos', 'destiny', 'meaning', 'existence', 'reality', 'choice',
   'capitalis', 'socialis', 'racism', 'sexism', 'anxiety', 'depression', 'confidence', 'issues',
   'illusion', 'attitude', 'feeling', 'emotion', 'memory', 'dream', 'consequence', 'potential',
+  'stuff', 'life', 'world', 'time', 'money', 'work', 'thing', 'way ', 'love', 'forever',
+  'whatever', 'past', 'future', 'mistake', 'poverty', 'selection', 'theory', 'penalty',
+  'policy', 'system', 'boomer', 'millennial', 'generation', 'culture', 'economy', 'society',
+  'compromise', 'tradition', 'history', 'science', 'politics', 'religion', 'education',
 ]
 
+/**
+ * Adjectives you could see, hear or touch. "Hot cheese" and "A tiny horse"
+ * are pictures because of these, and nothing else in the card says so.
+ */
+const SENSORY_WORDS = [
+  'hot', 'cold', 'warm', 'wet', 'dry', 'big', 'huge', 'tiny', 'little', 'fat', 'thin',
+  'long', 'short', 'dark', 'bright', 'loud', 'quiet', 'soft', 'hard', 'sticky', 'slimy',
+  'greasy', 'hairy', 'naked', 'bloody', 'rotten', 'crusty', 'steamy', 'juicy', 'smelly',
+  'squishy', 'fuzzy', 'shiny', 'rusty', 'burnt', 'frozen', 'melted', 'crushed', 'stuck',
+]
+
+/**
+ * Verbs that describe a state rather than a scene. "Being a woman." opens with
+ * an -ing and is not a thing you could film, and neither is "Pretending to
+ * care." Without this they were scored as actions, which is how they beat
+ * nipple blades.
+ */
+const STATE_GERUNDS = new Set([
+  'being', 'having', 'feeling', 'seeming', 'knowing', 'wanting', 'believing', 'caring',
+  'understanding', 'pretending', 'existing', 'becoming', 'staying', 'remaining', 'thinking',
+  'hoping', 'wishing', 'trying', 'needing', 'loving', 'hating', 'complaining', 'waiting',
+  'realizing', 'realising', 'accepting', 'forgetting', 'remembering', 'deserving',
+])
+
 /** Words ending a sentence that make it abstract whatever the stem is. */
-const ABSTRACT_SUFFIX = /(ness|ity|ism|ence|ance|ship|hood|dom|acy)\b/i
+const ABSTRACT_SUFFIX =
+  /(ness|ity|ism|ence|ance|ship|hood|dom|acy|tion|sion|ment|ery|ory|ics|ology|ty)\b/i
 
 /**
  * "-ing" does not make a verb. Without this, "Nothing." reads as an activity,
@@ -127,19 +157,32 @@ export function kindsOf(text: string): KindVector {
   const lower = ' ' + text.toLowerCase() + ' '
   const k = noKinds()
 
-  if (leadsWithGerund(text)) {
+  const opener = /^([a-z]+ing)\b/i.exec(text.trim())?.[1]?.toLowerCase()
+  if (opener && STATE_GERUNDS.has(opener)) {
+    // A state, not a scene: worth something as an answer, nothing as a picture.
+    k.activity += 0.35
+    k.quality += 0.9
+  } else if (leadsWithGerund(text)) {
     k.activity += 1.6
     k.event += 0.3
   }
   k.person += hits(lower, PERSON_WORDS) * 0.95
   k.place += hits(lower, PLACE_WORDS) * 0.9
-  k.object += hits(lower, OBJECT_WORDS) * 0.8
+  // Bodily and crude words are objects too. They were only ever scored as
+  // register, so half the deck read as having no physical content at all.
+  k.object +=
+    hits(lower, OBJECT_WORDS) * 0.8 +
+    hits(lower, GROSS_WORDS) * 0.7 +
+    hits(lower, CRUDE_WORDS) * 0.65 +
+    hits(lower, SENSORY_WORDS) * 0.45
   k.event += hits(lower, EVENT_WORDS) * 1.1
   k.quality += hits(lower, QUALITY_WORDS) * 1.2
   // The suffix is a last resort, not a verdict. "A live studio audience."
-  // ends in -ence and is a room full of people, so it only counts when
-  // nothing concrete was found at all.
-  const solid = k.person + k.object + k.place
+  // ends in -ence and is a room full of people; "A crucifixion." ends in -tion
+  // and is the most concrete thing in the deck. It only counts when nothing
+  // concrete was found at all, and an event counts as concrete: it is a thing
+  // that happens, which is exactly what you can picture.
+  const solid = k.person + k.object + k.place + k.event
   if (solid === 0 && ABSTRACT_SUFFIX.test(text)) k.quality += 0.7
 
   // A name is a thing in the world; whether it is a person or an object, it
@@ -150,11 +193,11 @@ export function kindsOf(text: string): KindVector {
     k.object += named * 0.35
   }
   // A bare plural ("Boogers.", "Explosions.", "Magnets.") is a countable thing.
-  if (/^[A-Z][a-z]+s\.?$/.test(text.trim())) k.object += 0.7
+  if (/^[A-Z][a-z]+s\.?$/.test(text.trim())) k.object += 0.25
   // An article means a noun phrase is coming, which is a thing or a person.
   if (/^(a|an|the) /i.test(text.trim())) {
-    k.object += 0.5
-    k.person += 0.15
+    k.object += 0.2
+    k.person += 0.1
   }
 
   // Nothing matched at all: assume a thing rather than an abstraction, which
@@ -187,8 +230,11 @@ export function vividnessOf(text: string, kinds: KindVector): number {
   // Start from "this is a thing in the world" and take away for abstraction,
   // rather than building up out of a word list that can never cover every
   // concrete noun in five hundred cards.
-  const raw = 0.5 + Math.min(0.5, solid * 0.22) + named * 0.2 + counted * 0.2 + detail * 0.5
-  return Math.max(0, Math.min(1.4, raw) - kinds.quality * 0.6)
+  // No flat floor: a card earns its imagery. A floor gave every unlisted
+  // abstraction the same score as a real picture, and half the deck piled up
+  // in one narrow band where nothing could be told from anything.
+  const raw = solid * 0.3 + named * 0.22 + counted * 0.2 + detail * 0.55
+  return Math.max(0, Math.min(2.2, raw) - kinds.quality * 0.5)
 }
 
 /* ── What the hole is asking for ────────────────────────────── */
@@ -278,6 +324,10 @@ export function expectationOf(setupText: string): Expectation {
     }
     if (frame.sense) senses[frame.sense] = true
   }
+  // A hole that takes a noun phrase takes a nominalised event too: "a
+  // crucifixion" fills the slot exactly as "a sandwich" does. Saying so here
+  // once is better than remembering to write `event` into every frame.
+  want.event = Math.max(want.event, want.object * 0.6)
   return { want, promotional, ...senses, matched }
 }
 
