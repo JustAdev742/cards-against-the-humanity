@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* ─────────────────────────────────────────────────────────────
    Cards Against The Humanity — design tokens
@@ -9,21 +9,21 @@
    always paired with their initial so color is never load-bearing.
    ───────────────────────────────────────────────────────────── */
 @theme {
-  --color-ink: #000000;          /* the table */
-  --color-card-black: #1a1817;   /* a black card, warm enough to read as an object */
-  --color-paper: #ffffff;        /* a white card */
-  --color-paper-edge: #d9d5d1;   /* the cut edge of a card */
+  --color-ink: #000000; /* the table */
+  --color-card-black: #1a1817; /* a black card, warm enough to read as an object */
+  --color-paper: #ffffff; /* a white card */
+  --color-paper-edge: #d9d5d1; /* the cut edge of a card */
   /* Muted text, checked against the surface it actually sits on:
      ash 7.5:1 on the table, ash-ink 7.6:1 on a white card. A TV is read
      from ten feet away, so both clear AAA rather than scraping AA. */
-  --color-ash: #9c9a97;          /* metadata on black */
-  --color-ash-bright: #b4b0ad;   /* metadata that has to carry across a room */
-  --color-ash-ink: #57534f;      /* metadata on a white card */
-  --color-line: #2e2b29;         /* hairlines on black */
+  --color-ash: #9c9a97; /* metadata on black */
+  --color-ash-bright: #b4b0ad; /* metadata that has to carry across a room */
+  --color-ash-ink: #57534f; /* metadata on a white card */
+  --color-line: #2e2b29; /* hairlines on black */
   --color-danger: #ff5a4a;
 
-  --font-display: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-display: 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   --radius-card: 14px;
   --ease-card: cubic-bezier(0.22, 1, 0.36, 1);
@@ -39,21 +39,31 @@
   --player-6: #ff7bc8;
   --player-7: #c8e04a;
   --player-8: #ff9e4a;
+  --player-9: #7ad4ff;
+  --player-10: #d88aff;
   /* Safe-area insets, so phone UI clears the notch and home indicator. */
   --inset-top: env(safe-area-inset-top, 0px);
   --inset-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-* { -webkit-tap-highlight-color: transparent; }
+* {
+  -webkit-tap-highlight-color: transparent;
+}
 
 /* No double-tap zoom and no 300ms delay on a phone that is being used as
    a game controller. */
 button,
 label,
 input,
-a { touch-action: manipulation; }
+a {
+  touch-action: manipulation;
+}
 
-html, body, #root { height: 100%; }
+html,
+body,
+#root {
+  height: 100%;
+}
 
 body {
   margin: 0;
@@ -110,7 +120,9 @@ body {
 /* The back of a card: the game's own mark, never a texture. */
 .card-back {
   background: var(--color-card-black);
-  box-shadow: inset 0 0 0 1px #33302e, 0 10px 24px -8px rgb(0 0 0 / 0.9);
+  box-shadow:
+    inset 0 0 0 1px #33302e,
+    0 10px 24px -8px rgb(0 0 0 / 0.9);
 }
 
 .label {
@@ -121,7 +133,9 @@ body {
   color: var(--color-ash);
 }
 
-.mono { font-family: var(--font-mono); }
+.mono {
+  font-family: var(--font-mono);
+}
 
 /* A blank on a black card: the rule you write on. */
 .blank {
@@ -141,8 +155,14 @@ body {
 /* The front page entrance. Done in CSS so the home route does not have to
    pull an animation library in before it can draw anything. */
 @keyframes rise {
-  from { opacity: 0; transform: translateY(22px); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .rise {
@@ -150,7 +170,9 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

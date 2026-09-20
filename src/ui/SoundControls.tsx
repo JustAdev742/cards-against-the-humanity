@@ -17,8 +17,18 @@ function SpeakerIcon({ muted, className = '' }: { muted: boolean; className?: st
         <path d="m16 9.5 5 5m0-5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
       ) : (
         <>
-          <path d="M15.8 9.2a4 4 0 0 1 0 5.6" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-          <path d="M18.4 6.6a7.6 7.6 0 0 1 0 10.8" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+          <path
+            d="M15.8 9.2a4 4 0 0 1 0 5.6"
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinecap="round"
+          />
+          <path
+            d="M18.4 6.6a7.6 7.6 0 0 1 0 10.8"
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinecap="round"
+          />
         </>
       )}
     </svg>
@@ -35,9 +45,11 @@ export function MuteButton({ music, className = '' }: { music: Music; className?
       aria-pressed={music.muted}
       aria-label={music.muted ? 'Unmute the music' : 'Mute the music'}
       title={`${music.muted ? 'Unmute' : 'Mute'} (M)`}
-      className={`cursor-pointer text-ash transition-colors hover:text-paper ${className}`}
+      // The box is always a target; the className sizes the icon inside it.
+      // An icon is not a tap target, and on a TV this is a mouse target too.
+      className="grid min-h-11 min-w-11 cursor-pointer place-items-center text-ash transition-colors hover:text-paper"
     >
-      <SpeakerIcon muted={music.muted} className="w-full" />
+      <SpeakerIcon muted={music.muted} className={className || 'w-5'} />
     </button>
   )
 }
@@ -137,7 +149,10 @@ export function SoundControls({ music, size = 'tv' }: { music: Music; size?: 'tv
         <button
           type="button"
           onClick={() => (canRememberTrack() ? music.chooseTrack() : fileRef.current?.click())}
-          className="label cursor-pointer underline decoration-line underline-offset-4 hover:text-paper! hover:decoration-paper"
+          className={
+            'label inline-flex min-h-11 cursor-pointer items-center underline ' +
+            'decoration-line underline-offset-4 hover:text-paper! hover:decoration-paper'
+          }
         >
           {music.needsPermission
             ? 'Play the saved track'

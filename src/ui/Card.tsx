@@ -1,7 +1,7 @@
-import { motion, useReducedMotion } from "motion/react";
-import type { CSSProperties, ReactNode } from "react";
+import { motion, useReducedMotion } from 'motion/react'
+import type { CSSProperties, ReactNode } from 'react'
 
-import type { BlackCard } from "../game/types.ts";
+import type { BlackCard } from '../game/types.ts'
 
 /**
  * Card text is set the way the printed deck sets it: one size that fills the
@@ -9,32 +9,23 @@ import type { BlackCard } from "../game/types.ts";
  * a one-word card both read as the same object.
  */
 function sizeFor(text: string, scale: string): string {
-  const n = text.length;
-  const step =
-    n > 150 ? 0.52 : n > 110 ? 0.62 : n > 75 ? 0.74 : n > 45 ? 0.86 : 1;
-  return `calc(${scale} * ${step})`;
+  const n = text.length
+  const step = n > 150 ? 0.52 : n > 110 ? 0.62 : n > 75 ? 0.74 : n > 45 ? 0.86 : 1
+  return `calc(${scale} * ${step})`
 }
 
 /** Strips the full stop off an answer that is being dropped into a sentence. */
 function inline(answer: string): string {
-  return answer.endsWith(".") && !answer.endsWith("..")
-    ? answer.slice(0, -1)
-    : answer;
+  return answer.endsWith('.') && !answer.endsWith('..') ? answer.slice(0, -1) : answer
 }
 
 /**
  * Renders a black card, filling its blanks with whatever has been played.
  * A card with no blank is a question: its answers are shown after the text.
  */
-export function BlackCardText({
-  card,
-  fills,
-}: {
-  card: BlackCard;
-  fills?: string[];
-}) {
-  const parts = card.t.split("_");
-  const answers = fills ?? [];
+export function BlackCardText({ card, fills }: { card: BlackCard; fills?: string[] }) {
+  const parts = card.t.split('_')
+  const answers = fills ?? []
 
   if (parts.length === 1) {
     return (
@@ -42,14 +33,12 @@ export function BlackCardText({
         {card.t}
         {answers.length > 0 && (
           <>
-            {" "}
-            <span className="blank-filled">
-              {answers.map(inline).join(" ")}
-            </span>
+            {' '}
+            <span className="blank-filled">{answers.map(inline).join(' ')}</span>
           </>
         )}
       </span>
-    );
+    )
   }
 
   return (
@@ -66,43 +55,35 @@ export function BlackCardText({
         </span>
       ))}
     </span>
-  );
+  )
 }
 
 /** A plain-text version of a filled card, for screen readers and labels. */
-export function blackCardSentence(
-  card: BlackCard,
-  fills: string[] = [],
-): string {
-  const parts = card.t.split("_");
+export function blackCardSentence(card: BlackCard, fills: string[] = []): string {
+  const parts = card.t.split('_')
   if (parts.length === 1) {
-    return fills.length ? `${card.t} ${fills.map(inline).join(" ")}` : card.t;
+    return fills.length ? `${card.t} ${fills.map(inline).join(' ')}` : card.t
   }
   return parts
     .map(
       (part, index) =>
-        part +
-        (index < parts.length - 1
-          ? fills[index]
-            ? inline(fills[index])
-            : "…"
-          : ""),
+        part + (index < parts.length - 1 ? (fills[index] ? inline(fills[index]) : '…') : ''),
     )
-    .join("");
+    .join('')
 }
 
 interface CardProps {
   /** Base font size as a CSS length, before the length step is applied. */
-  scale: string;
-  className?: string;
-  style?: CSSProperties;
-  footer?: ReactNode;
+  scale: string
+  className?: string
+  style?: CSSProperties
+  footer?: ReactNode
 }
 
 export function WhiteCard({
   text,
   scale,
-  className = "",
+  className = '',
   style,
   footer,
 }: CardProps & { text: string }) {
@@ -114,14 +95,14 @@ export function WhiteCard({
       <p className="m-0">{text}</p>
       {footer}
     </article>
-  );
+  )
 }
 
 export function BlackCardFace({
   card,
   fills,
   scale,
-  className = "",
+  className = '',
   style,
   footer,
 }: CardProps & { card: BlackCard; fills?: string[] }) {
@@ -141,7 +122,7 @@ export function BlackCardFace({
             Pick
             <span
               className="grid aspect-square w-[1.6em] place-items-center rounded-full bg-paper text-ink"
-              style={{ fontSize: "1.05em" }}
+              style={{ fontSize: '1.05em' }}
             >
               {card.p}
             </span>
@@ -149,26 +130,16 @@ export function BlackCardFace({
         )}
       </div>
     </article>
-  );
+  )
 }
 
 /** The back of a card: the deck's own mark, nothing else. */
-export function CardBack({
-  className = "",
-  style,
-}: {
-  className?: string;
-  style?: CSSProperties;
-}) {
+export function CardBack({ className = '', style }: { className?: string; style?: CSSProperties }) {
   return (
-    <div
-      className={`card-back grid place-items-center ${className}`}
-      style={style}
-      aria-hidden
-    >
+    <div className={`card-back grid place-items-center ${className}`} style={style} aria-hidden>
       <CardMark className="w-[34%] opacity-70" />
     </div>
-  );
+  )
 }
 
 /**
@@ -185,28 +156,26 @@ export function CardBack({
 export function FlipCard({
   faceUp,
   front,
-  className = "",
+  className = '',
   flipIn = false,
   delay = 0,
 }: {
-  faceUp: boolean;
-  front: ReactNode;
-  className?: string;
+  faceUp: boolean
+  front: ReactNode
+  className?: string
   /** Turn over on mount, for lists that arrive all at once rather than
    *  holding every slot open from the start. */
-  flipIn?: boolean;
+  flipIn?: boolean
   /** Stagger, so a row of these turns over like a hand being laid out. */
-  delay?: number;
+  delay?: number
 }) {
-  const reduced = useReducedMotion();
+  const reduced = useReducedMotion()
   return (
     <motion.div
       className={`relative ${className}`}
-      style={{ transformStyle: "preserve-3d" }}
+      style={{ transformStyle: 'preserve-3d' }}
       initial={flipIn && !reduced ? { rotateY: 180 } : false}
-      animate={
-        reduced ? { opacity: faceUp ? 1 : 0.9 } : { rotateY: faceUp ? 0 : 180 }
-      }
+      animate={reduced ? { opacity: faceUp ? 1 : 0.9 } : { rotateY: faceUp ? 0 : 180 }}
       transition={
         reduced
           ? { duration: 0.12 }
@@ -217,8 +186,8 @@ export function FlipCard({
     >
       <div
         style={{
-          backfaceVisibility: "hidden",
-          WebkitBackfaceVisibility: "hidden",
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
         }}
       >
         {faceUp || reduced ? front : null}
@@ -226,20 +195,20 @@ export function FlipCard({
       <div
         className="absolute inset-0"
         style={{
-          backfaceVisibility: "hidden",
-          WebkitBackfaceVisibility: "hidden",
-          transform: "rotateY(180deg)",
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          transform: 'rotateY(180deg)',
         }}
         aria-hidden
       >
         <CardBack className="h-full w-full text-paper" />
       </div>
     </motion.div>
-  );
+  )
 }
 
 /** Two cards, offset — the mark printed on the deck itself. */
-export function CardMark({ className = "" }: { className?: string }) {
+export function CardMark({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 40 46" fill="none" className={className} aria-hidden>
       <path
@@ -248,14 +217,7 @@ export function CardMark({ className = "" }: { className?: string }) {
         strokeWidth="2.6"
         strokeLinejoin="round"
       />
-      <rect
-        x="14.5"
-        y="4.2"
-        width="22"
-        height="37"
-        rx="2.4"
-        fill="currentColor"
-      />
+      <rect x="14.5" y="4.2" width="22" height="37" rx="2.4" fill="currentColor" />
     </svg>
-  );
+  )
 }

@@ -167,7 +167,11 @@ function NameForm({
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-10 pt-[max(1.5rem,var(--inset-top))]">
-      <button type="button" onClick={onBack} className="label w-fit cursor-pointer hover:text-paper!">
+      <button
+        type="button"
+        onClick={onBack}
+        className="label -ml-2 flex min-h-11 w-fit cursor-pointer items-center px-2 hover:text-paper!"
+      >
         ← Back
       </button>
       <form
@@ -181,7 +185,7 @@ function NameForm({
           }
         }}
       >
-        <h2 className="m-0 text-3xl font-extrabold tracking-[-0.03em]">{title}</h2>
+        <h1 className="m-0 text-3xl font-extrabold tracking-[-0.03em]">{title}</h1>
         <div className="flex flex-col gap-2">
           <label htmlFor="host-name" className="label">
             Your name

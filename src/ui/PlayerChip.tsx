@@ -1,7 +1,7 @@
 import type { PlayerView } from '../net/protocol.ts'
 
 export function playerColor(index: number): string {
-  return `var(--player-${(index % 8) + 1})`
+  return `var(--player-${(index % 10) + 1})`
 }
 
 /**
@@ -15,7 +15,12 @@ export function PlayerDot({
   player: Pick<PlayerView, 'name' | 'color' | 'connected'>
   size?: 'sm' | 'md' | 'lg'
 }) {
-  const box = size === 'lg' ? 'w-10 h-10 text-lg' : size === 'sm' ? 'w-5 h-5 text-[0.6rem]' : 'w-7 h-7 text-xs'
+  const box =
+    size === 'lg'
+      ? 'w-10 h-10 text-lg'
+      : size === 'sm'
+        ? 'w-5 h-5 text-[0.6rem]'
+        : 'w-7 h-7 text-xs'
   return (
     <span
       aria-hidden

@@ -204,7 +204,7 @@ test('the game ends when someone reaches the target score', () => {
   assert.equal(standings(state)[0].score, 2)
 })
 
-test('Rando Cardrissian plays every round but never scores', () => {
+test('Rando Cardrissian plays every round and keeps his own score', () => {
   const state = tableOf(['Ann', 'Ben', 'Cal'], { rando: true })
   startGame(state)
 
@@ -217,7 +217,53 @@ test('Rando Cardrissian plays every round but never scores', () => {
   chooseWinner(state, RANDO_ID)
 
   assert.equal(state.winnerId, RANDO_ID)
-  assert.equal(state.players.every((p) => p.score === 0), true)
+  assert.equal(state.randoScore, 1, 'the lobby promises he can win, so he has to score')
+  assert.equal(
+    state.players.every((p) => p.score === 0),
+    true,
+    'and he takes nothing from anybody else',
+  )
+})
+
+test('Rando can take the whole game', () => {
+  const state = tableOf(['Ann', 'Ben', 'Cal'], { rando: true, targetScore: 2 })
+  startGame(state)
+  for (let round = 0; round < 2; round++) {
+    everyonePlays(state)
+    revealAll(state)
+    chooseWinner(state, RANDO_ID)
+    assert.equal(state.randoScore, round + 1)
+    nextRound(state)
+  }
+  assert.equal(state.phase, 'gameOver', 'reaching the target ends the game for him too')
+  assert.equal(state.winnerId, RANDO_ID)
+})
+
+test('a stale Rando score cannot end a game he is not dealt into', () => {
+  const state = tableOf(['Ann', 'Ben', 'Cal'], { rando: false, targetScore: 2 })
+  startGame(state)
+  assert.equal(
+    state.submissions.some((s) => s.playerId === RANDO_ID),
+    false,
+  )
+  state.randoScore = 99
+  everyonePlays(state)
+  revealAll(state)
+  chooseWinner(state, state.players.find((p) => p.id !== state.czarId)!.id)
+  nextRound(state)
+  assert.notEqual(state.phase, 'gameOver')
+})
+
+test('playing again wipes Rando’s score with everybody else’s', () => {
+  const state = tableOf(['Ann', 'Ben', 'Cal'], { rando: true, targetScore: 1 })
+  startGame(state)
+  everyonePlays(state)
+  revealAll(state)
+  chooseWinner(state, RANDO_ID)
+  nextRound(state)
+  assert.equal(state.phase, 'gameOver')
+  playAgain(state)
+  assert.equal(state.randoScore, 0)
 })
 
 test('a dropped connection does not stall the round', () => {
@@ -238,7 +284,10 @@ test('a player who leaves gives their cards back and vacates the round', () => {
   removePlayer(state, 'id-Dee')
   assert.equal(state.players.length, 3)
   assert.equal(state.whiteDiscard.length, discardBefore + 10)
-  assert.equal(state.submissions.some((s) => s.playerId === 'id-Dee'), false)
+  assert.equal(
+    state.submissions.some((s) => s.playerId === 'id-Dee'),
+    false,
+  )
 })
 
 test('if the Czar leaves, the round restarts under a new Czar', () => {
@@ -328,7 +377,10 @@ test('play again clears the score but keeps everyone seated', () => {
   assert.equal(state.phase, 'lobby')
   assert.equal(state.round, 0)
   assert.equal(state.players.length, 3)
-  assert.equal(state.players.every((p) => p.score === 0 && p.hand.length === 0), true)
+  assert.equal(
+    state.players.every((p) => p.score === 0 && p.hand.length === 0),
+    true,
+  )
 })
 
 test('pick 2 and pick 3 cards take exactly that many, in order', () => {

@@ -56,7 +56,7 @@ All of them live in the lobby, on the TV or on the first player's phone.
 | --- | --- | --- |
 | Deck | Full · Family Edition | Two separate printed boxes. |
 | Play to | 5 · 7 · 10 | Roughly a quarter hour, half an hour, a whole evening. |
-| Rando Cardrissian | Off · On | A random card plays every round. If it wins, everyone should feel bad. |
+| Rando Cardrissian | Off · On | A random card plays every round. He keeps a score and can take the game, at which point everyone should feel bad. |
 | Meritocracy | Off · On | The winner judges the next round instead of the job going round the table. |
 | Add a bot | Up to six | Seats a guest who plays and judges for itself. See below. |
 | Music | Volume, mute, track | TV, and the device running an online table. |

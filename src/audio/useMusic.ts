@@ -89,7 +89,10 @@ export function useMusic(): Music {
   if (audioRef.current === null && typeof document !== 'undefined') {
     const audio = document.createElement('audio')
     audio.loop = true
-    audio.preload = 'auto'
+    // Not 'auto': the bundled track is an hour long, and 'auto' invites the
+    // browser to fetch all thirty megabytes of it. Streaming as it plays is
+    // what a loop actually needs, and phones now do this too.
+    audio.preload = 'metadata'
     audio.volume = 0
     audio.hidden = true
     audio.setAttribute('aria-hidden', 'true')

@@ -31,7 +31,7 @@ export function Doorway({
           <button
             type="button"
             onClick={back.onClick}
-            className="label ml-auto cursor-pointer hover:text-paper!"
+            className="label -mr-2 ml-auto flex min-h-11 cursor-pointer items-center px-2 hover:text-paper!"
           >
             ← {back.label}
           </button>

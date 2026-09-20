@@ -103,6 +103,7 @@ export function tableView(state: GameState): TableView {
     winningCards: state.winningCards,
     targetScore: state.options.targetScore,
     rando: state.options.rando,
+    randoScore: state.randoScore,
     meritocracy: state.options.meritocracy,
     nextCzarId: state.phase === 'roundEnd' ? nextCzarId(state) : null,
     deck: state.options.deck,
@@ -140,9 +141,7 @@ export function createHost(
   // A public table takes one of the reserved codes so strangers can find it;
   // a private one takes a random code that nobody can guess.
   const freeSlots =
-    visibility === 'public'
-      ? PUBLIC_CODES.slice().sort(() => Math.random() - 0.5)
-      : []
+    visibility === 'public' ? PUBLIC_CODES.slice().sort(() => Math.random() - 0.5) : []
   let code = visibility === 'public' ? (freeSlots.shift() ?? makeRoomCode()) : makeRoomCode()
   let state = createGame(code, options)
   let peer: Peer | null = null

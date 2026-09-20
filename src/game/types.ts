@@ -66,6 +66,8 @@ export interface GameState {
   revealed: number
   winnerId: string | null
   winningCards: string[] | null
+  /** Rando keeps his own score: he is not a player, but he can still win. */
+  randoScore: number
   whiteDeck: string[]
   blackDeck: BlackCard[]
   whiteDiscard: string[]

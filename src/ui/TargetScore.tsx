@@ -19,9 +19,7 @@ export function TargetScore({
 
   return (
     <fieldset className="m-0 border-0 p-0" disabled={disabled}>
-      <legend className={`label ${tv ? 'text-[min(1.3vw,1.1rem)]!' : ''}`}>
-        Play to
-      </legend>
+      <legend className={`label ${tv ? 'text-[min(1.3vw,1.1rem)]!' : ''}`}>Play to</legend>
       <div className={`mt-3 flex ${tv ? 'gap-[0.8vw]' : 'gap-2'}`}>
         {TARGETS.map((target) => {
           const checked = value === target

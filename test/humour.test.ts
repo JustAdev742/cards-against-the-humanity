@@ -44,7 +44,11 @@ const CASES: Case[] = [
     why: 'a question about a smell wants something that has one',
     card: { t: 'What’s that smell?', p: 1 },
     best: 'Boogers.',
-    flat: ['A live studio audience.', 'The illusion of choice in a late-stage capitalist society.', 'Magnets.'],
+    flat: [
+      'A live studio audience.',
+      'The illusion of choice in a late-stage capitalist society.',
+      'Magnets.',
+    ],
   },
   {
     why: 'the same celebrity that answers nothing above is exactly right here',
@@ -61,7 +65,10 @@ const CASES: Case[] = [
   },
   {
     why: '“and now I’m ___” wants what you have become',
-    card: { t: 'My name is Peter Parker. I was bitten by a radioactive spider, and now I’m _.', p: 1 },
+    card: {
+      t: 'My name is Peter Parker. I was bitten by a radioactive spider, and now I’m _.',
+      p: 1,
+    },
     best: 'A sorry excuse for a father.',
     flat: ['Website.', 'Magnets.', 'Hope.', 'Silence.'],
   },
@@ -69,7 +76,12 @@ const CASES: Case[] = [
     why: 'a bathroom you are warned about contains a thing, not a concept',
     card: { t: 'Dude, do not go in that bathroom. There’s _ in there.', p: 1 },
     best: 'Many bats.',
-    flat: ['Shame.', 'White privilege.', 'The illusion of choice in a late-stage capitalist society.', 'Hope.'],
+    flat: [
+      'Shame.',
+      'White privilege.',
+      'The illusion of choice in a late-stage capitalist society.',
+      'Hope.',
+    ],
   },
   {
     why: 'airport security confiscates objects, not attitudes',
@@ -81,7 +93,11 @@ const CASES: Case[] = [
     why: 'a snack slogan wants something you could put in your mouth',
     card: { t: '_. Betcha can’t have just one!', p: 1 },
     best: 'Boneless buffalo wings.',
-    flat: ['White privilege.', 'Crippling debt.', 'The illusion of choice in a late-stage capitalist society.'],
+    flat: [
+      'White privilege.',
+      'Crippling debt.',
+      'The illusion of choice in a late-stage capitalist society.',
+    ],
   },
   {
     why: '“high on ___” wants something you could be high on',
@@ -167,12 +183,15 @@ const CASES: Case[] = [
 /* ── The benchmark has to be made of real cards ─────────────── */
 
 test('every card in the benchmark is one that ships in a deck', () => {
-  const black = new Set([...(blackCards as BlackCard[]), ...(familyBlack as BlackCard[])].map((c) => c.t))
+  const black = new Set(
+    [...(blackCards as BlackCard[]), ...(familyBlack as BlackCard[])].map((c) => c.t),
+  )
   const white = new Set([...(whiteCards as string[]), ...(familyWhite as string[])])
   const missing: string[] = []
   for (const c of CASES) {
     if (!black.has(c.card.t)) missing.push(`black: ${c.card.t}`)
-    for (const answer of [c.best, ...c.flat]) if (!white.has(answer)) missing.push(`white: ${answer}`)
+    for (const answer of [c.best, ...c.flat])
+      if (!white.has(answer)) missing.push(`white: ${answer}`)
   }
   assert.deepEqual(missing, [], 'a benchmark made of invented cards proves nothing')
 })
@@ -191,7 +210,9 @@ test('the model picks the card a person would, on every held-out pairing', () =>
   for (const { why, card, best, flat } of CASES) {
     const ranked = rank(card, [best, ...flat])
     if (ranked[0].text !== best) {
-      missed.push(`  ${card.t}\n    wanted: ${best}\n    picked: ${ranked[0].text}\n    because: ${why}`)
+      missed.push(
+        `  ${card.t}\n    wanted: ${best}\n    picked: ${ranked[0].text}\n    because: ${why}`,
+      )
     }
   }
   assert.equal(
@@ -208,7 +229,9 @@ test('the personalities broadly agree when the answer is obvious', () => {
   for (const { card, best, flat } of CASES) {
     const agree = PERSONALITIES.filter((p) => rank(card, [best, ...flat], p.taste)[0].text === best)
     if (agree.length < 4) {
-      weak.push(`  ${card.t} — only ${agree.length}/6 (${agree.map((p) => p.name).join(', ') || 'nobody'})`)
+      weak.push(
+        `  ${card.t} — only ${agree.length}/6 (${agree.map((p) => p.name).join(', ') || 'nobody'})`,
+      )
     }
   }
   assert.equal(weak.length, 0, `too much disagreement on obvious cards:\n${weak.join('\n')}`)
@@ -223,7 +246,11 @@ test('given a whole hand, a bot plays the card that lands', () => {
     const played = chooseCards(card, [...flat, best], CONSENSUS, undefined, top)
     if (played[0] !== best) missed.push(`  ${card.t}\n    played: ${played[0]} (wanted ${best})`)
   }
-  assert.equal(missed.length, 0, `played the wrong card ${missed.length} times:\n${missed.join('\n')}`)
+  assert.equal(
+    missed.length,
+    0,
+    `played the wrong card ${missed.length} times:\n${missed.join('\n')}`,
+  )
 })
 
 /* ── Guarding against a lookup table in disguise ────────────── */
@@ -244,9 +271,18 @@ test('the benchmark cards get no special treatment anywhere in the model', () =>
   // If the model recognised the test cards by name, paraphrasing one would
   // collapse its score. The wording changes, the judgement should not.
   const reworded: { from: BlackCard; to: BlackCard }[] = [
-    { from: { t: 'What’s that sound?', p: 1 }, to: { t: 'Hey, what is that noise coming from the basement?', p: 1 } },
-    { from: { t: 'TSA guidelines now prohibit _ on airplanes.', p: 1 }, to: { t: 'Airport security has banned _ from the terminal.', p: 1 } },
-    { from: { t: 'How did I lose my virginity?', p: 1 }, to: { t: 'How did I end up in the hospital?', p: 1 } },
+    {
+      from: { t: 'What’s that sound?', p: 1 },
+      to: { t: 'Hey, what is that noise coming from the basement?', p: 1 },
+    },
+    {
+      from: { t: 'TSA guidelines now prohibit _ on airplanes.', p: 1 },
+      to: { t: 'Airport security has banned _ from the terminal.', p: 1 },
+    },
+    {
+      from: { t: 'How did I lose my virginity?', p: 1 },
+      to: { t: 'How did I end up in the hospital?', p: 1 },
+    },
   ]
   for (const { from, to } of reworded) {
     const original = CASES.find((c) => c.card.t === from.t)!

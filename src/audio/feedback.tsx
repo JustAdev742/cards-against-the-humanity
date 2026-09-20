@@ -60,7 +60,7 @@ const FeedbackContext = createContext<Feedback>(SILENT)
  * is there for a pocket and the click is there for a hand, and which one lands
  * depends on the phone and how its owner has it set.
  *
- * The sound is quiet and switchable on purpose — a table can hold eight of these.
+ * The sound is quiet and switchable on purpose — a table can hold ten of these.
  */
 export function FeedbackProvider({ children }: { children: ReactNode }) {
   const [soundOn, setSoundOn] = useState(read)

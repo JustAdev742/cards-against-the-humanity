@@ -110,7 +110,10 @@ const PAIRS: Pair[] = [
   },
   {
     why: 'what Peter Parker became should be a person, and a sad one',
-    card: { t: 'My name is Peter Parker. I was bitten by a radioactive spider, and now I’m _.', p: 1 },
+    card: {
+      t: 'My name is Peter Parker. I was bitten by a radioactive spider, and now I’m _.',
+      p: 1,
+    },
     funny: 'A sorry excuse for a father.',
     correctButFlat: 'A narc.',
   },
@@ -122,7 +125,10 @@ const PAIRS: Pair[] = [
   },
   {
     why: 'a moon-landing speech wants something absurd up there, not a concept',
-    card: { t: 'My fellow Americans: Before this decade is out, we will have _ on the moon!', p: 1 },
+    card: {
+      t: 'My fellow Americans: Before this decade is out, we will have _ on the moon!',
+      p: 1,
+    },
     funny: 'An octopus giving seven handjobs and smoking a cigarette.',
     correctButFlat: 'Natural selection.',
   },
@@ -167,7 +173,9 @@ test('most of the table finds the funny one funnier', () => {
   // is his whole character. Nobody else should be making his mistake.
   const weak: string[] = []
   for (const { card, funny, correctButFlat } of PAIRS) {
-    const agree = PERSONALITIES.filter((p) => score(card, funny, p.taste) > score(card, correctButFlat, p.taste))
+    const agree = PERSONALITIES.filter(
+      (p) => score(card, funny, p.taste) > score(card, correctButFlat, p.taste),
+    )
     if (agree.length < 4) weak.push(`  ${card.t} — only ${agree.length}/6`)
   }
   assert.equal(weak.length, 0, `the table missed the joke:\n${weak.join('\n')}`)

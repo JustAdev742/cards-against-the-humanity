@@ -88,8 +88,14 @@ export const PERSONALITIES: Personality[] = [
     name: 'Wendell',
     blurb: 'Deadpan. Answers a lurid question with something painfully ordinary.',
     taste: mix({
-      kind: 2.2, contrast: 1.5, clash: 0.2, crude: -0.4, gross: -0.2,
-      vivid: 1.2, twist: 0.5, chaos: 0.2,
+      kind: 2.2,
+      contrast: 1.5,
+      clash: 0.2,
+      crude: -0.4,
+      gross: -0.2,
+      vivid: 1.2,
+      twist: 0.5,
+      chaos: 0.2,
     }),
   },
   {
@@ -211,7 +217,16 @@ export function scoreWith(signals: Signals, taste: Taste): number {
 /* ── Learning who likes what ────────────────────────────────── */
 
 const LEARNED_KEYS = [
-  'kind', 'clash', 'vivid', 'twist', 'alive', 'contrast', 'gross', 'crude', 'abstract', 'echo',
+  'kind',
+  'clash',
+  'vivid',
+  'twist',
+  'alive',
+  'contrast',
+  'gross',
+  'crude',
+  'abstract',
+  'echo',
 ] as const
 type LearnedKey = (typeof LEARNED_KEYS)[number]
 

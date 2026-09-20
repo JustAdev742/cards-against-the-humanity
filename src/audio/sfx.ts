@@ -1,7 +1,7 @@
 /**
  * Table sounds, synthesised rather than sampled: a few oscillators cost
  * nothing to ship and cannot be the wrong licence. These only ever play on
- * the TV — the TV has the speakers, and eight phones chirping at once would
+ * the TV — the TV has the speakers, and ten phones chirping at once would
  * be unbearable.
  */
 
@@ -11,7 +11,9 @@ let master: GainNode | null = null
 /** Browsers only allow audio after a gesture, so this runs on the first click. */
 export function unlockAudio(): void {
   if (!ctx) {
-    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    const Ctor =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!Ctor) return
     ctx = new Ctor()
     master = ctx.createGain()
@@ -115,7 +117,7 @@ export function sfxDeal(): void {
 
 /* ── Phone interface sounds ─────────────────────────────────────
    Much smaller than the table sounds above: a phone is six inches from
-   a face, and a room can hold eight of them. These are dry clicks in the
+   a face, and a room can hold ten of them. These are dry clicks in the
    40–140 ms range, quiet enough to sit under conversation. */
 
 /** Picking a card up. */

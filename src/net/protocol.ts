@@ -96,6 +96,8 @@ export interface TableView {
   winningCards: string[] | null
   targetScore: number
   rando: boolean
+  /** Rando's score. He is not a player, but he keeps one and can win. */
+  randoScore: number
   meritocracy: boolean
   /** Who judges next, while the winning card is up. */
   nextCzarId: string | null
@@ -124,5 +126,5 @@ export type ServerMessage =
   | { type: 'table'; table: TableView }
   | { type: 'self'; self: SelfView }
   | { type: 'error'; message: string }
-  | { type: 'rejected'; reason: 'full' | 'nameTaken' }
+  | { type: 'rejected'; reason: 'full' | 'nameTaken' | 'noName' }
   | { type: 'pong' }

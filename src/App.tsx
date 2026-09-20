@@ -23,35 +23,31 @@ const HostedTable = lazy(() =>
 )
 
 type Mode =
-  | 'home'
-  | 'local'
-  | 'tv'
-  | 'join'
-  | 'online'
-  | 'private'
-  | 'public'
-  | 'hostPrivate'
-  | 'hostPublic'
+  'home' | 'local' | 'tv' | 'join' | 'online' | 'private' | 'public' | 'hostPrivate' | 'hostPublic'
 
 /** A code in the address bar means a QR scan or a shared link: go and join. */
 function codeFromUrl(): string {
   const raw = new URLSearchParams(location.search).get('r') ?? ''
-  return raw.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 4)
+  return raw
+    .replace(/[^A-Za-z]/g, '')
+    .toUpperCase()
+    .slice(0, 4)
 }
 
 /**
- * Shown while a screen's chunk arrives. Brief, but it is a real page state,
- * so it carries the same landmark and heading as any other.
+ * Shown while a screen's chunk arrives.
+ *
+ * Deliberately not a <main>: React keeps the screen being replaced mounted
+ * while the fallback shows, so making this a landmark too gave the page two
+ * of them on every transition. A moment with none is the better trade, and
+ * it announces itself as a status either way.
  */
 function Loading() {
   return (
-    <main className="grid h-dvh place-items-center">
-      <h1 className="sr-only">Cards Against The Humanity</h1>
+    <div className="grid h-dvh place-items-center" role="status">
       <CardMark className="w-10 animate-pulse text-ash" />
-      <p className="sr-only" role="status">
-        Loading…
-      </p>
-    </main>
+      <span className="sr-only">Loading…</span>
+    </div>
   )
 }
 

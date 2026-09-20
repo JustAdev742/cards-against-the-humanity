@@ -100,7 +100,10 @@ test('it does not just parrot the setup back', () => {
   const setup = setupFeatures(card)
   const taste = PERSONALITIES[4].taste
   const parrot = scoreWith(signalsFor(setup, answerFeatures('Batman.'), 0), taste)
-  const notParrot = scoreWith(signalsFor(setup, answerFeatures('Boneless buffalo wings.'), 0), taste)
+  const notParrot = scoreWith(
+    signalsFor(setup, answerFeatures('Boneless buffalo wings.'), 0),
+    taste,
+  )
   assert.ok(notParrot > parrot, 'echoing the setup should cost something')
 })
 
@@ -172,7 +175,10 @@ test('a bot judge picks one of the cards actually in front of it', () => {
       cards: deal(WHITE, card.p, rand),
     }))
     const winner = judge(card, submissions, PERSONALITIES[1].taste, rand)
-    assert.ok(submissions.some((s) => s.playerId === winner), 'the winner has to be at the table')
+    assert.ok(
+      submissions.some((s) => s.playerId === winner),
+      'the winner has to be at the table',
+    )
   }
 })
 
@@ -241,18 +247,36 @@ test('six bots dealt the same hand do not all play the same card', () => {
   }
   const average = distinct / rounds
   assert.ok(average >= 2.4, `the table only found ${average.toFixed(2)} different cards out of 6`)
-  assert.ok(unanimous / rounds < 0.1, `all six agreed ${((100 * unanimous) / rounds).toFixed(1)}% of the time`)
+  assert.ok(
+    unanimous / rounds < 0.1,
+    `all six agreed ${((100 * unanimous) / rounds).toFixed(1)}% of the time`,
+  )
 })
 
 test('a bot still knows the difference between a good card and a bad one', () => {
   // Variety is not the same as guessing: given one obviously right answer and
   // nine abstractions, it should still find it nearly every time.
   const card: BlackCard = { t: 'What’s that smell?', p: 1 }
-  const duds = ['Hope.', 'Shame.', 'Silence.', 'White privilege.', 'Complaining.',
-    'Pretending to care.', 'Crippling debt.', 'Daddy issues.', 'A positive attitude!']
+  const duds = [
+    'Hope.',
+    'Shame.',
+    'Silence.',
+    'White privilege.',
+    'Complaining.',
+    'Pretending to care.',
+    'Crippling debt.',
+    'Daddy issues.',
+    'A positive attitude!',
+  ]
   let found = 0
   for (let i = 0; i < 100; i++) {
-    const played = chooseCards(card, ['Boogers.', ...duds], personalityFor('hutch').taste, undefined, seeded(i))
+    const played = chooseCards(
+      card,
+      ['Boogers.', ...duds],
+      personalityFor('hutch').taste,
+      undefined,
+      seeded(i),
+    )
     if (played[0] === 'Boogers.') found++
   }
   assert.ok(found >= 85, `only found the one real answer ${found} times in 100`)

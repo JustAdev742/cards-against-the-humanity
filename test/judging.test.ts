@@ -83,8 +83,14 @@ function accuracy(kind: string, samples = 60): number {
       // Both orders, so a judge cannot be right by always taking the first.
       const order =
         i % 2 === 0
-          ? [{ playerId: 'funny', cards: [funny] }, { playerId: 'flat', cards: [flat] }]
-          : [{ playerId: 'flat', cards: [flat] }, { playerId: 'funny', cards: [funny] }]
+          ? [
+              { playerId: 'funny', cards: [funny] },
+              { playerId: 'flat', cards: [flat] },
+            ]
+          : [
+              { playerId: 'flat', cards: [flat] },
+              { playerId: 'funny', cards: [funny] },
+            ]
       if (judge(card, order, taste, rand) === 'funny') right++
       total++
     }
@@ -99,9 +105,14 @@ test('a bot judge gives the point to the better card far more often than not', (
     // table, but even he has to beat a coin toss by a clear margin.
     const floor = p.kind === 'pip' ? 0.6 : 0.75
     const score = accuracy(p.kind)
-    if (score < floor) weak.push(`  ${p.name}: ${(100 * score).toFixed(0)}% (needs ${100 * floor}%)`)
+    if (score < floor)
+      weak.push(`  ${p.name}: ${(100 * score).toFixed(0)}% (needs ${100 * floor}%)`)
   }
-  assert.equal(weak.length, 0, `these judges are handing out points for nothing:\n${weak.join('\n')}`)
+  assert.equal(
+    weak.length,
+    0,
+    `these judges are handing out points for nothing:\n${weak.join('\n')}`,
+  )
 })
 
 test('a judge does not just reward whoever went first', () => {
@@ -117,7 +128,10 @@ test('a judge does not just reward whoever went first', () => {
     if (judge(card, subs, personalityFor('hutch').taste, rand) === 'a') first++
   }
   // Four submissions, so position alone should win about a quarter of the time.
-  assert.ok(first / runs < 0.4, `the first submission won ${((100 * first) / runs).toFixed(0)}% of rounds`)
+  assert.ok(
+    first / runs < 0.4,
+    `the first submission won ${((100 * first) / runs).toFixed(0)}% of rounds`,
+  )
 })
 
 test('the table does not have one shared verdict', () => {

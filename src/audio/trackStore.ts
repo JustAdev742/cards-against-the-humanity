@@ -38,14 +38,23 @@ function open(): Promise<IDBDatabase> {
   })
 }
 
-async function transact<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest): Promise<T | null> {
+async function transact<T>(
+  mode: IDBTransactionMode,
+  run: (store: IDBObjectStore) => IDBRequest,
+): Promise<T | null> {
   try {
     const db = await open()
-    return await new Promise<T | null>((resolve) => {
-      const request = run(db.transaction(STORE, mode).objectStore(STORE))
-      request.onsuccess = () => resolve((request.result as T | undefined) ?? null)
-      request.onerror = () => resolve(null)
-    })
+    try {
+      return await new Promise<T | null>((resolve) => {
+        const request = run(db.transaction(STORE, mode).objectStore(STORE))
+        request.onsuccess = () => resolve((request.result as T | undefined) ?? null)
+        request.onerror = () => resolve(null)
+      })
+    } finally {
+      // Every call opened a connection and left it open, which holds the
+      // database against any later version change as well as leaking.
+      db.close()
+    }
   } catch {
     return null
   }

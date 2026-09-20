@@ -42,7 +42,24 @@ export function CodeInput({
   const refs = useRef<(HTMLInputElement | null)[]>([])
   const [focused, setFocused] = useState(-1)
 
-  const chars = Array.from({ length }, (_, i) => value[i] ?? '')
+  /**
+   * The cells are held here rather than sliced back out of `value` on every
+   * render, because a string cannot hold a gap. Deriving them meant clearing
+   * the second box of "ABCD" produced "ACD", which the next render read as
+   * A-C-D-blank: the letters after the gap shifted left, and typing a
+   * replacement then silently dropped one.
+   */
+  const [chars, setChars] = useState<string[]>(() =>
+    Array.from({ length }, (_, i) => value[i] ?? ''),
+  )
+  // What we last told the parent, so a value it changes itself is adopted but
+  // the shorter string we report for a gapped code is not read back as a move.
+  const reported = useRef(value)
+  useEffect(() => {
+    if (value === reported.current) return
+    reported.current = value
+    setChars(Array.from({ length }, (_, i) => value[i] ?? ''))
+  }, [value, length])
 
   const completed = useRef(onComplete)
   completed.current = onComplete
@@ -57,10 +74,15 @@ export function CodeInput({
   )
 
   const commit = useCallback(
-    (next: string) => {
-      const cleaned = next.slice(0, length)
-      onChange(cleaned)
-      if (cleaned.length === length) completed.current?.(cleaned)
+    (next: string[]) => {
+      const cells = next.slice(0, length)
+      setChars(cells)
+      // A gap collapses in the reported string, which is what the parent wants:
+      // it only cares about a code, and a gapped one is not yet a code.
+      const code = cells.join('')
+      reported.current = code
+      onChange(code)
+      if (cells.length === length && cells.every(Boolean)) completed.current?.(code)
     },
     [length, onChange],
   )
@@ -80,7 +102,7 @@ export function CodeInput({
         next[cursor] = char
         cursor += 1
       }
-      commit(next.join('').trimEnd())
+      commit(next)
       focusAt(cursor)
     },
     [chars, commit, focusAt, length],
@@ -93,14 +115,15 @@ export function CodeInput({
   const setChar = (index: number, char: string) => {
     const next = chars.slice()
     next[index] = char
-    commit(next.join(''))
+    commit(next)
   }
 
   const handleChange = (index: number) => (event: ChangeEvent<HTMLInputElement>) => {
     const previous = chars[index]
     const raw = event.currentTarget.value
     // Mobile keyboards often hand back the whole field, not just the new key.
-    const trimmed = raw.length > 1 && previous && raw.startsWith(previous) ? raw.slice(previous.length) : raw
+    const trimmed =
+      raw.length > 1 && previous && raw.startsWith(previous) ? raw.slice(previous.length) : raw
     const incoming = trimmed
       .split('')
       .filter((c) => ALLOWED.test(c))

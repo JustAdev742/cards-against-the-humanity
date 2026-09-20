@@ -18,6 +18,7 @@ import {
   startGame,
 } from '../src/game/engine.ts'
 import { shouldDrop } from '../src/net/liveness.ts'
+import { MAX_PLAYERS } from '../src/game/types.ts'
 import type { GameState } from '../src/game/types.ts'
 
 const SEED = 4242
@@ -223,10 +224,10 @@ test('everyone dropping at once does not throw', () => {
 
 test('a hand is always refilled before a player has to use it', () => {
   // Ten players, the small deck, and a long night: the deck has to keep up.
-  const state = tableOf(
-    ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'],
-    { deck: 'family', targetScore: 999 },
-  )
+  const state = tableOf(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'], {
+    deck: 'family',
+    targetScore: 999,
+  })
   startGame(state)
 
   for (let round = 0; round < 80; round++) {
@@ -261,8 +262,16 @@ test('starting twice does not reshuffle a game in progress', () => {
   startGame(state)
 
   assert.equal(state.round, round, 'the round counter must not reset')
-  assert.deepEqual(state.players.map((p) => p.hand.join('|')), hands, 'hands must not be redealt')
-  assert.deepEqual(state.players.map((p) => p.score), scores, 'scores must survive')
+  assert.deepEqual(
+    state.players.map((p) => p.hand.join('|')),
+    hands,
+    'hands must not be redealt',
+  )
+  assert.deepEqual(
+    state.players.map((p) => p.score),
+    scores,
+    'scores must survive',
+  )
 })
 
 test('play again cannot be used to wipe a live scoreboard', () => {
@@ -309,7 +318,11 @@ test('a phone is dropped fast when its channel has gone, slowly when it has not'
   const phone = { connected: true, bot: undefined }
   assert.equal(shouldDrop(phone, 3_000, false), false, 'a blip is not a disconnect')
   assert.equal(shouldDrop(phone, 11_000, false), true, 'a dead channel gets no patience')
-  assert.equal(shouldDrop(phone, 11_000, true), false, 'an open channel gets the benefit of the doubt')
+  assert.equal(
+    shouldDrop(phone, 11_000, true),
+    false,
+    'an open channel gets the benefit of the doubt',
+  )
   assert.equal(shouldDrop(phone, 30_000, true), true, 'but not forever')
 })
 
@@ -328,4 +341,91 @@ test('a table of one human and two bots is not short-handed', () => {
   everyonePlays(state)
   assert.equal(state.phase, 'judging')
   assert.equal(isShortHanded(state), false)
+})
+
+/* ── The table does not trust what it is told ───────────────────
+   The forms will not submit a nameless player, but the table cannot
+   assume the thing talking to it is one of our forms. */
+
+test('a seat cannot be taken without a name', () => {
+  const state = tableOf(['Ada'])
+  for (const attempt of ['', '   ', '\t\n']) {
+    const result = addPlayer(state, 'ghost', attempt)
+    assert.equal(result.ok, false, `"${attempt}" was allowed to sit down`)
+    if (!result.ok) assert.equal(result.reason, 'noName')
+  }
+  assert.equal(state.players.length, 1, 'nobody nameless made it to the table')
+})
+
+test('a name is trimmed and capped, and two people cannot share one', () => {
+  const state = tableOf([])
+  assert.equal(addPlayer(state, 'a', '  Ada  ').ok, true)
+  assert.equal(state.players[0].name, 'Ada')
+  const long = addPlayer(state, 'b', 'Bartholomew the Exceedingly Verbose')
+  assert.equal(long.ok, true)
+  assert.ok(state.players[1].name.length <= 14, 'a long name is cut to fit the rail')
+  const clash = addPlayer(state, 'c', 'ada')
+  assert.equal(clash.ok, false)
+  if (!clash.ok) assert.equal(clash.reason, 'nameTaken')
+})
+
+test('a full table gives everybody their own colour', () => {
+  const state = tableOf([])
+  for (let i = 0; i < MAX_PLAYERS; i++) addPlayer(state, `p${i}`, `P${i}`)
+  const colours = state.players.map((p) => p.color)
+  assert.equal(new Set(colours).size, MAX_PLAYERS, `two seats shared a colour: ${colours}`)
+})
+
+/* ── A game always ends ─────────────────────────────────────────
+   Browser runs can only ever say "it had not finished yet". This says
+   it finishes, under every combination of the house rules. */
+
+test('every combination of the house rules reaches a winner', () => {
+  for (const rando of [false, true]) {
+    for (const meritocracy of [false, true]) {
+      for (const seats of [3, 6, 10]) {
+        const names = Array.from({ length: seats }, (_, i) => `P${i}`)
+        const state = tableOf(names, { rando, meritocracy, targetScore: 5 })
+        startGame(state)
+
+        let rounds = 0
+        while (state.phase !== 'gameOver') {
+          if (++rounds > 400) {
+            assert.fail(
+              `rando=${rando} meritocracy=${meritocracy} seats=${seats} never ended ` +
+                `(round ${state.round}, scores ${state.players.map((p) => p.score).join(',')}, ` +
+                `rando ${state.randoScore})`,
+            )
+          }
+          everyonePlays(state)
+          revealAll(state)
+          // The Czar hands it to whoever is first in the reveal order, which
+          // is shuffled, so this is not the same seat every time.
+          chooseWinner(state, state.revealOrder[0])
+          nextRound(state)
+        }
+        const best = Math.max(...state.players.map((p) => p.score), rando ? state.randoScore : 0)
+        assert.ok(best >= 5, `the game ended before anybody reached the target`)
+      }
+    }
+  }
+})
+
+test('a game still ends when players keep leaving and coming back', () => {
+  const state = tableOf(['Ann', 'Ben', 'Cal', 'Dee'], { targetScore: 4 })
+  startGame(state)
+  let rounds = 0
+  while (state.phase !== 'gameOver') {
+    if (++rounds > 400) assert.fail(`stalled at round ${state.round}`)
+    // Somebody's phone drops every third round and comes back the next one.
+    if (rounds % 3 === 0) setConnected(state, 'id-Dee', false)
+    if (rounds % 3 === 1) setConnected(state, 'id-Dee', true)
+    everyonePlays(state)
+    if (state.phase === 'judging') {
+      revealAll(state)
+      chooseWinner(state, state.revealOrder[0])
+    }
+    if (state.phase === 'roundEnd') nextRound(state)
+  }
+  assert.equal(state.phase, 'gameOver')
 })

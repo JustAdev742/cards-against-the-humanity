@@ -68,8 +68,14 @@ test('the job keeps going round, one seat at a time', () => {
   }
 
   assert.deepEqual(order, [
-    'id-Ann', 'id-Ben', 'id-Cal', 'id-Dee',
-    'id-Ann', 'id-Ben', 'id-Cal', 'id-Dee',
+    'id-Ann',
+    'id-Ben',
+    'id-Cal',
+    'id-Dee',
+    'id-Ann',
+    'id-Ben',
+    'id-Cal',
+    'id-Dee',
   ])
 })
 

@@ -1,3 +1,4 @@
+import { MAX_PLAYERS } from '../game/types.ts'
 import type { SelfView, ServerMessage, TableView } from './protocol.ts'
 
 export type SeatStatus = 'connecting' | 'connected' | 'reconnecting' | 'rejected' | 'error'
@@ -44,7 +45,9 @@ export function applyServerMessage(snapshot: SeatSnapshot, message: ServerMessag
       snapshot.status = 'rejected'
       snapshot.notice =
         message.reason === 'full'
-          ? 'That table is full. Ten players is the limit.'
-          : 'Someone at this table already goes by that name. Pick another.'
+          ? `That table is full. ${MAX_PLAYERS} players is the limit.`
+          : message.reason === 'noName'
+            ? 'Type a name before taking a seat.'
+            : 'Someone at this table already goes by that name. Pick another.'
   }
 }

@@ -75,8 +75,7 @@ const CODE_ALPHABET = 'ABCDEFGHJKLMNPRTUVWXY'
  */
 export const PUBLIC_CODES: readonly string[] = CODE_ALPHABET.split('').map((c) => `PUB${c}`)
 
-export const isPublicCode = (code: string): boolean =>
-  PUBLIC_CODES.includes(code.toUpperCase())
+export const isPublicCode = (code: string): boolean => PUBLIC_CODES.includes(code.toUpperCase())
 
 export function makeRoomCode(rand: () => number = Math.random): string {
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -143,6 +142,7 @@ export function createGame(
     revealed: 0,
     winnerId: null,
     winningCards: null,
+    randoScore: 0,
     whiteDeck: shuffle(whitePool(settings.deck), rand),
     blackDeck: shuffle(blackPool(settings.deck), rand),
     whiteDiscard: [],
@@ -152,12 +152,14 @@ export function createGame(
 }
 
 export type JoinResult =
-  | { ok: true; player: Player }
-  | { ok: false; reason: 'full' | 'nameTaken' }
+  { ok: true; player: Player } | { ok: false; reason: 'full' | 'nameTaken' | 'noName' }
 
 export function addPlayer(state: GameState, id: string, rawName: string): JoinResult {
   const name = rawName.trim().slice(0, 14)
   const existing = state.players.find((p) => p.id === id)
+  // The forms will not submit an empty name, but the table cannot assume the
+  // thing talking to it is one of our forms.
+  if (!existing && !name) return { ok: false, reason: 'noName' }
   if (existing) {
     // A reconnecting phone keeps its seat, its hand and its score.
     const wasAway = !existing.connected
@@ -173,7 +175,7 @@ export function addPlayer(state: GameState, id: string, rawName: string): JoinRe
 
   const used = new Set(state.players.map((p) => p.color))
   let color = 0
-  while (used.has(color) && color < 7) color++
+  while (used.has(color) && color < MAX_PLAYERS - 1) color++
 
   const player: Player = { id, name, score: 0, connected: true, color, hand: [] }
   // Someone arriving mid-game is dealt in now and plays from the next round.
@@ -411,7 +413,11 @@ export function chooseWinner(state: GameState, playerId: string): GameState {
   state.winningCards = submission.cards
   state.phase = 'roundEnd'
 
-  if (playerId !== RANDO_ID) {
+  if (playerId === RANDO_ID) {
+    // The printed rule is that Rando can take the whole game, and the lobby
+    // says as much. He is not in `players`, so his score lives on the table.
+    state.randoScore += 1
+  } else {
     const winner = state.players.find((p) => p.id === playerId)
     if (winner) winner.score += 1
   }
@@ -436,7 +442,10 @@ export function nextCzarId(state: GameState): string | null {
 export function nextRound(state: GameState): GameState {
   if (state.phase !== 'roundEnd') return state
 
-  const best = state.players.reduce((top, p) => Math.max(top, p.score), 0)
+  const best = state.players.reduce(
+    (top, p) => Math.max(top, p.score),
+    state.options.rando ? state.randoScore : 0,
+  )
   if (best >= state.options.targetScore) {
     state.phase = 'gameOver'
     return state
@@ -464,6 +473,7 @@ export function playAgain(state: GameState): GameState {
   state.revealed = 0
   state.winnerId = null
   state.winningCards = null
+  state.randoScore = 0
   return state
 }
 
