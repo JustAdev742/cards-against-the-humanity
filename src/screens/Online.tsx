@@ -11,6 +11,7 @@ import { CardMark } from '../ui/Card.tsx'
 import { DoorCard } from '../ui/DoorCard.tsx'
 import { Doorway } from './Home.tsx'
 import { Seat, Shell } from './Phone.tsx'
+import { useMusic } from '../audio/useMusic.ts'
 
 /* ── Choosing a kind of game ────────────────────────────────── */
 
@@ -254,6 +255,14 @@ function RunningTable({
   const [error, setError] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const clientRef = useRef<ReturnType<typeof createLocalClient> | null>(null)
+  // An online table has no TV to carry the room, so it carries it itself.
+  const music = useMusic()
+
+  // Opening the table was a click, which is the gesture browsers want before
+  // they will play anything.
+  useEffect(() => {
+    if (music.available && !music.playing) music.start()
+  }, [music])
 
   useEffect(() => {
     let host: Host | null = null
@@ -314,6 +323,7 @@ function RunningTable({
         client={clientRef.current}
         table={snapshot.table}
         self={snapshot.self}
+        music={music}
       />
     </Shell>
   )

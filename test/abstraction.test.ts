@@ -40,6 +40,12 @@ const PICTURES = [
   'Pooping in a laptop and closing it.',
   'The tampon from my vagina.',
   'An octopus giving seven handjobs and smoking a cigarette.',
+  // Single-word pictures. These used to score below half the abstractions,
+  // because vividness counted content instead of weighing it.
+  'Crab.',
+  'Goat.',
+  'Bananas.',
+  'Magnets.',
 ]
 
 /** Things you could only argue about. */
@@ -68,6 +74,7 @@ const IDEAS = [
   'Complaining.',
   'Nobody giving a shit about anything anymore.',
   'Fading away into nothingness.',
+  'The South.',
 ]
 
 test('every card in the abstraction benchmark ships in the deck', () => {

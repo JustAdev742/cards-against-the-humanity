@@ -59,7 +59,7 @@ All of them live in the lobby, on the TV or on the first player's phone.
 | Rando Cardrissian | Off · On | A random card plays every round. If it wins, everyone should feel bad. |
 | Meritocracy | Off · On | The winner judges the next round instead of the job going round the table. |
 | Add a bot | Up to six | Seats a guest who plays and judges for itself. See below. |
-| Music | Volume, mute, track | TV only. See below. |
+| Music | Volume, mute, track | TV, and the device running an online table. |
 
 ### Two decks
 
@@ -179,6 +179,22 @@ The other measurement, for what it is worth: against six bots and one seat that
 just plays off the top of its hand, the random seat wins 2.4% of rounds where an
 even split would be 14.3%.
 
+### Judging is measured separately
+
+A bot that plays well and judges at random is worse for a table than one that
+does neither, because it hands out points for nothing — and until it was
+measured, nothing tested the half of a bot's job that decides everybody else's
+score. It turned out the accuracy was fine (82–100% of the time it gives the
+point to the better card) and the problem was somewhere else entirely: the
+judges all agreed with each other. Ozzy and Hutch reached the same verdict on
+85% of rounds, which makes it meaningless who is holding the Czar card.
+
+So a bot now judges with more conviction than it plays with. Playing a card is
+a guess at what the Czar wants, so it hedges towards the table's shared taste;
+holding the Czar card is the one moment its own taste is the only thing that
+counts, so it stops hedging. Average agreement between any two judges fell from
+roughly four rounds in five to under three, without costing accuracy.
+
 ### They work out who they are playing with
 
 Every bot watches every verdict, including ones it was not part of, and compares
@@ -215,6 +231,12 @@ the table turns a move down, and a flourish when you take the round. The clicks
 are quiet and short by design, because a table can hold eight phones; the
 speaker icon in the phone's header turns them off, and the choice is remembered.
 Anyone who has asked their system for reduced motion gets no vibration.
+
+**An online table** carries the room itself, because there is no TV to do it.
+The device that opened the table plays the same loop, with the same controls in
+the lobby and the same ducking under a winning card. A phone joining a TV in the
+same room deliberately does not: two copies of one loop a half-second apart is
+worse than silence.
 
 Every cue on both screens is synthesised in the browser from a few oscillators,
 so there is nothing to download and nothing to license. The background music is

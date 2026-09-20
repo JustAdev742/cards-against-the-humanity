@@ -352,13 +352,34 @@ export function chooseCards(
   return chosen
 }
 
+/**
+ * How far a judge leans into whatever makes it different from the rest of the
+ * table. Playing a card is a guess at what the Czar wants, so a bot hedges
+ * towards the consensus; holding the Czar card is the one moment its own taste
+ * is the only thing that counts, so it stops hedging. Without this the judges
+ * agreed with each other on four verdicts in five, and who was judging stopped
+ * meaning anything.
+ */
+const JUDGE_CONVICTION = 2.1
+
+/** The same taste, with everything ordinary about it taken back out. */
+export function asJudge(taste: Taste): Taste {
+  const own = { ...taste }
+  for (const key of Object.keys(own) as (keyof Taste)[]) {
+    if (key === 'chaos') continue
+    own[key] = CONSENSUS[key] + (taste[key] - CONSENSUS[key]) * JUDGE_CONVICTION
+  }
+  return own
+}
+
 /** Which submission a bot laughs at most. */
 export function judge(
   card: BlackCard,
   submissions: { playerId: string; cards: string[] }[],
-  taste: Taste,
+  rawTaste: Taste,
   rand: () => number = Math.random,
 ): string {
+  const taste = asJudge(rawTaste)
   const setup = setupFeatures(card)
   const ranked = submissions
     .map((submission) => {

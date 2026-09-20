@@ -91,6 +91,8 @@ const QUALITY_WORDS = [
   'whatever', 'past', 'future', 'mistake', 'poverty', 'selection', 'theory', 'penalty',
   'policy', 'system', 'boomer', 'millennial', 'generation', 'culture', 'economy', 'society',
   'compromise', 'tradition', 'history', 'science', 'politics', 'religion', 'education',
+  'south', 'north', 'east', 'west', 'midwest', 'epidemic', 'crisis', 'movement', 'industry',
+  'media', 'internet', 'government', 'establishment', 'patriarchy', 'suburbs', 'mainstream',
 ]
 
 /**
@@ -233,8 +235,13 @@ export function vividnessOf(text: string, kinds: KindVector): number {
   // No flat floor: a card earns its imagery. A floor gave every unlisted
   // abstraction the same score as a real picture, and half the deck piled up
   // in one narrow band where nothing could be told from anything.
-  const raw = solid * 0.3 + named * 0.22 + counted * 0.2 + detail * 0.55
-  return Math.max(0, Math.min(2.2, raw) - kinds.quality * 0.5)
+  // Does it name anything real at all? This saturates fast and deliberately:
+  // a card can only be anchored in the world once, and "Crab." is as anchored
+  // as a card gets. Elaboration is then a separate, smaller bonus on top, so a
+  // long card cannot out-picture a short one merely by having more words.
+  const anchored = Math.min(1, solid / 1.1)
+  const raw = anchored * 0.95 + detail * 0.75 + named * 0.18 + counted * 0.18
+  return Math.max(0, Math.min(2.2, raw) - kinds.quality * 0.7)
 }
 
 /* ── What the hole is asking for ────────────────────────────── */
